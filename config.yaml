@@ -1,0 +1,12 @@
+resource_url:
+  keywords: ["/entry.swf","/resource.cfg"]
+
+file_manager:
+  resource_save_path: "./essence_resource"
+
+net_work:
+  max_connection: 50
+  timeout: 60
+
+system:
+  debug: True
