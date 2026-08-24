@@ -1,2 +1,19 @@
-.tests/
+essence_resource/**
 
+# === IDE ===
+.idea/
+.vscode/
+*.iml
+DS_Store
+
+# === Python ===
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
