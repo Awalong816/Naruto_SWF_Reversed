@@ -3,4 +3,4 @@ httpx
 httpx[http2]
 pyyaml
 pathlib
-
+Py3AMF
