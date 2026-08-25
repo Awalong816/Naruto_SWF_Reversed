@@ -166,21 +166,21 @@ def analyze_tbs_cache_front(tbs_cache_path, cfg: Configs):
     return resource_requirement
 
 
-def analyze_tbs_cache_after(resource_dir: str, cfg: Configs):
+def analyze_tbs_cache_after(cfg: Configs):
     """
     # 后置文件总方法
-    :param resource_dir:
     :param cfg:
     :return:
     """
     debug = cfg.debug
+    resource_dir = cfg.resource_save_path
 
     # 分析resource得到core的指向
     resource_cfg_path = os.path.join(resource_dir, "resource.cfg")
     resource_cfg_path = Path(resource_cfg_path)
     if resource_cfg_path.exists() and resource_cfg_path.is_file():
         origin_data = resource_cfg_path.read_bytes()
-        decompressed_data, _ = decompress_manager.decompress(origin_data)
+        decompressed_data, _ = decompress_manager.decompress_bytes(origin_data)
     else:
         raise FileNotFoundError(f"resource.cfg文件路径不存在或无效: {resource_cfg_path}")
 

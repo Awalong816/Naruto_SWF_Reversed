@@ -2,7 +2,7 @@ import os
 import logging
 
 from config import Configs
-from workflow import get_qqgamebox_client_path, analyze_tbs_cache_front
+from workflow import get_qqgamebox_client_path, analyze_tbs_cache_front, analyze_tbs_cache_after
 from net import get_net_client
 
 logging.basicConfig(level=logging.INFO) # 最低播报等级
@@ -38,4 +38,11 @@ if __name__ == "__main__":
         logging.info(f"[INFO] 前置资源获取成功, 保存目录: {global_config.resource_save_path}")
     except Exception as err:
         logging.error(f"[ERROR] 获取前置资源文件失败: {err}")
+        exit(1)
+
+    # 处理后置资源
+    try:
+        analyze_tbs_cache_after(global_config)
+    except Exception as err:
+        logging.error(f"[ERROR] 后置资源处理错误: {err}")
         exit(1)
