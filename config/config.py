@@ -4,7 +4,8 @@ import yaml
 class Configs:
     def __init__(self):
         # resource_url
-        self.resource_keywords = []
+        self.font_resource_keywords = []
+        self.after_resource_keywords = []
         # file_manager
         self.resource_save_path = ""
         # net_work
@@ -18,7 +19,8 @@ class Configs:
             config_dict = dict(yaml.safe_load(file))
             # resource_url
             resource_url_cfg = config_dict.get("resource_url", {})
-            self.resource_keywords = list(resource_url_cfg.get("keywords", []))
+            self.font_resource_keywords = list(resource_url_cfg.get("font_keywords", []))
+            self.after_resource_keywords = list(resource_url_cfg.get("after_keywords", []))
             # file_manager
             file_manager_cfg = config_dict.get("file_manager", {})
             self.resource_save_path = str(file_manager_cfg.get("resource_save_path", "../essence_resource"))

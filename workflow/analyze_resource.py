@@ -12,13 +12,15 @@ if project_root not in sys.path:
 
 # 现在可以直接导入
 from config import Configs
+from utils import get_decompress_manager
 
+# 筛选url二进制字节段
 # re.compile 包装成对象，使用search方法进行正则匹配
 # https? http后面只跟0或1个s
 # [...] 匹配其中任意一个字符
 # `]` 需要转义成`\]`否则视为结束
 # ]后的`+`表示匹配一个或多个
-url_tpf = re.compile( # 筛选url二进制字节段
+url_tpf = re.compile(
     rb"https?://[A-Za-z0-9._~:/?#[\]@!$&()*+,;=%-]+"
 )
 
@@ -26,7 +28,7 @@ version_sign = re.compile(
     r"https://res\.huoying\.qq\.com/NarutoBeta(\d+)\.(\d+)Build(\d+)"
 )
 
-net_client = None
+decompress_manager = get_decompress_manager()
 
 
 def url_tpf_test():
@@ -40,27 +42,37 @@ def test_func(name):
         return url_tpf_test()
 
 
-def find_url_history(dir_path: str):
+def find_url(item, mode, pattern):
     urls = []
-    if not dir_path.endswith("/tbs_cache"):
-        dir_path = os.path.join(dir_path, "tbs_cache")
-    # Path创建一个文件管理类来遍历 path(dir_path)类初始化
-    dir_handle = Path(dir_path)
-    # rglob '*'=遍历所有文件和文件夹(**包含子文件夹下的所有文件**)
-    for item in dir_handle.rglob("*"):
-        # 如果不是文件就略过
-        if not item.is_file():
-            continue
-        else:
-            try:
-                data = item.read_bytes() # 读出二进制数据
-            except Exception as err:
-                logging.warning(f"[WARN] <{item.name}> 读取二进制数据失败: {err}")
 
-        for match in url_tpf.findall(data):
+    if mode == "path":
+        # Path创建一个文件管理类来遍历 path(dir_path)类初始化
+        item_path = Path(item)
+        # rglob '*'=遍历所有文件和文件夹(**包含子文件夹下的所有文件**)
+        for item in item_path.rglob("*"):
+            # 如果不是文件就略过
+            if not item.is_file():
+                continue
+            else:
+                try:
+                    data = item.read_bytes()  # 读出二进制数据
+                except Exception as err:
+                    logging.warning(f"[WARN] <{item.name}> 读取二进制数据失败: {err}")
+                    continue
+
+            for match in pattern.findall(data):
+                match_str = match.decode('utf-8', errors="ignore")
+                url_parts = urlsplit(match_str)
+                url_parse = urlunsplit(
+                    (url_parts.scheme, url_parts.netloc, url_parts.path, "", ""))  # 移除请求参数,组成要求固定五个部分
+                urls.append(url_parse)
+
+    elif mode == "bytes":
+        for match in pattern.findall(item):
             match_str = match.decode('utf-8', errors="ignore")
             url_parts = urlsplit(match_str)
-            url_parse = urlunsplit((url_parts.scheme, url_parts.netloc, url_parts.path, "", "")) # 移除请求参数,组成要求固定五个部分
+            url_parse = urlunsplit(
+                (url_parts.scheme, url_parts.netloc, url_parts.path, "", ""))  # 移除请求参数,组成要求固定五个部分
             urls.append(url_parse)
 
     return list(set(urls))
@@ -136,11 +148,13 @@ def analyze_tbs_cache_front(tbs_cache_path, cfg: Configs):
     """
     debug = cfg.debug
 
-    urls = find_url_history(tbs_cache_path)
+    urls = find_url(item=tbs_cache_path, mode="path", pattern=url_tpf)
     if debug:
         print(f"all urls in tbs_cache:\n{urls}")
+    if len(urls) < 1:
+        raise Exception("没有找到缓存url请求记录")
 
-    keywords = cfg.resource_keywords
+    keywords = cfg.font_resource_keywords
     resource_urls = sift_url(urls, keywords)
     if debug:
         print(f"resource urls:\n{resource_urls}")
@@ -160,8 +174,18 @@ def analyze_tbs_cache_after(resource_dir: str, cfg: Configs):
     :return:
     """
     debug = cfg.debug
-    # 根据entry的解密方式 解密resource内的core
-    pass
+
+    # 分析resource得到core的指向
+    resource_cfg_path = os.path.join(resource_dir, "resource.cfg")
+    resource_cfg_path = Path(resource_cfg_path)
+    if resource_cfg_path.exists() and resource_cfg_path.is_file():
+        origin_data = resource_cfg_path.read_bytes()
+        decompressed_data, _ = decompress_manager.decompress(origin_data)
+    else:
+        raise FileNotFoundError(f"resource.cfg文件路径不存在或无效: {resource_cfg_path}")
+
+    if not decompressed_data:
+        raise Exception(f"resource.cfg文件解压失败或内容为空")
 
 
 if __name__ == "__main__":

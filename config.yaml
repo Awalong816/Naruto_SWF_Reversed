@@ -1,5 +1,6 @@
 resource_url:
-  keywords: ["/entry.swf","/resource.cfg"]
+  font_keywords: ["/entry.swf","/resource.cfg"]
+  after_keywords: ["/core.swf",]
 
 file_manager:
   resource_save_path: "./essence_resource"

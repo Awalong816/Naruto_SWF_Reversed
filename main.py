@@ -1,7 +1,8 @@
+import os
 import logging
 
 from config import Configs
-from utils import get_qqgamebox_client_path, analyze_tbs_cache_front
+from workflow import get_qqgamebox_client_path, analyze_tbs_cache_front
 from net import get_net_client
 
 logging.basicConfig(level=logging.INFO) # 最低播报等级
@@ -25,7 +26,8 @@ if __name__ == "__main__":
 
     # 分析本地tbs缓存得到前置资源
     try:
-        resource_requirement = analyze_tbs_cache_front(essence_dir, global_config)
+        tbs_cache_path = os.path.join(essence_dir, "tbs_cache")
+        resource_requirement = analyze_tbs_cache_front(tbs_cache_path, global_config)
     except Exception as err:
         logging.error(f"[ERROR] 获取前置资源url表单失败: {err}")
         exit(1)
