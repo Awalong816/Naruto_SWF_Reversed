@@ -187,6 +187,12 @@ def analyze_tbs_cache_after(cfg: Configs):
     if not decompressed_data:
         raise Exception(f"resource.cfg文件解压失败或内容为空")
 
+    if decompressed_data[4] == 0x11:
+        # print("amf3格式")
+        pass
+    else:
+        raise TypeError(f"resource.cfg 格式未知")
+
 
 if __name__ == "__main__":
     func_name = "url_tpf"
