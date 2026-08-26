@@ -1,4 +1,5 @@
 essence_resource/**
+tests/**
 
 # === IDE ===
 .idea/

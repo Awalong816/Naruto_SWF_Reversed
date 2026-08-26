@@ -1,7 +1,7 @@
-import sys
+import logging
 import os
 import re
-import logging
+import sys
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
@@ -12,7 +12,7 @@ if project_root not in sys.path:
 
 # 现在可以直接导入
 from config import Configs
-from utils import get_decompress_manager
+from utils import get_decompress_manager, get_type_reader_manager
 
 # 筛选url二进制字节段
 # re.compile 包装成对象，使用search方法进行正则匹配
@@ -29,6 +29,7 @@ version_sign = re.compile(
 )
 
 decompress_manager = get_decompress_manager()
+type_reader_manager = get_type_reader_manager()
 
 
 def url_tpf_test():
@@ -143,7 +144,7 @@ def analyze_tbs_cache_front(tbs_cache_path, cfg: Configs):
     # 前置文件总方法 (本地缓存)
     解析请求过的缓存文件，找到关键swf，cfg资源url站点下载，下一步确定socket端口
     :param tbs_cache_path: tbs缓存目录的路径
-    :param cfg: 项目的配置
+    :param cfg: 项目全局配置
     :return: requirement: 需要下载的前置资源，一般包括 entry.swf, resource.cfg
     """
     debug = cfg.debug
@@ -169,13 +170,14 @@ def analyze_tbs_cache_front(tbs_cache_path, cfg: Configs):
 def analyze_tbs_cache_after(cfg: Configs):
     """
     # 后置文件总方法
-    :param cfg:
+    :param cfg: 项目全局配置
     :return:
     """
     debug = cfg.debug
     resource_dir = cfg.resource_save_path
 
     # 分析resource得到core的指向
+    ## 解压缩
     resource_cfg_path = os.path.join(resource_dir, "resource.cfg")
     resource_cfg_path = Path(resource_cfg_path)
     if resource_cfg_path.exists() and resource_cfg_path.is_file():
@@ -186,14 +188,42 @@ def analyze_tbs_cache_after(cfg: Configs):
 
     if not decompressed_data:
         raise Exception(f"resource.cfg文件解压失败或内容为空")
-
+    ## 读取
     if decompressed_data[4] == 0x11:
         # print("amf3格式")
-        pass
+        resource_cfg_data_type = "amf3"
     else:
         raise TypeError(f"resource.cfg 格式未知")
 
+    # resource 找 flash.core.swf 索引
+    resource_cfg_dict = type_reader_manager.read_bytes(decompressed_data, resource_cfg_data_type)
+    resource_list = []
+
+    for item_name, rule in resource_cfg_dict.items():
+        for keyword in cfg.after_resource_keywords:
+            try:
+                if keyword in rule["url"]:
+                    resource_url = urlunsplit([
+                        "https",
+                        "res.huoying.qq.com",
+                        f"/{rule['tag']}/{rule['url']}",
+                        "",
+                        "",
+                    ])
+            except TypeError:
+                continue
+
+    if len(resource_list) < 1:
+        raise ValueError(f"resource文件没有找到 <{cfg.after_resource_keywords}> 记录")
+
+    resource_requirement = select_version(resource_list, cfg.after_resource_keywords, debug)
+    print(f"resource_requirement: {resource_requirement}")
+
 
 if __name__ == "__main__":
-    func_name = "url_tpf"
-    print(test_func(func_name))
+    # print("当前工作目录:", Path.cwd())
+    # print("实际查找位置:", resource_cfg_path.resolve())
+
+    cfg = Configs()
+    cfg.initialization_configs(r"/Users/mars/PycharmProjects/study/启动器/Naruto_SWF_Reversed/config.yaml")
+    analyze_tbs_cache_after(cfg)
