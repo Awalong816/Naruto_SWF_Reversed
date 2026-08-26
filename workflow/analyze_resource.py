@@ -197,7 +197,7 @@ def analyze_tbs_cache_after(cfg: Configs):
 
     # resource 找 flash.core.swf 索引
     resource_cfg_dict = type_reader_manager.read_bytes(decompressed_data, resource_cfg_data_type)
-    resource_list = []
+    resource_url_list = []
 
     for item_name, rule in resource_cfg_dict.items():
         for keyword in cfg.after_resource_keywords:
@@ -210,14 +210,18 @@ def analyze_tbs_cache_after(cfg: Configs):
                         "",
                         "",
                     ])
+                    resource_url_list.append(resource_url)
             except TypeError:
                 continue
 
-    if len(resource_list) < 1:
+    if len(resource_url_list) < 1:
         raise ValueError(f"resource文件没有找到 <{cfg.after_resource_keywords}> 记录")
 
-    resource_requirement = select_version(resource_list, cfg.after_resource_keywords, debug)
-    print(f"resource_requirement: {resource_requirement}")
+    resource_requirement = select_version(resource_url_list, cfg.after_resource_keywords, debug)
+    if debug:
+        print(f"resource_requirement: {resource_requirement}")
+
+    return resource_requirement
 
 
 if __name__ == "__main__":
@@ -225,5 +229,5 @@ if __name__ == "__main__":
     # print("实际查找位置:", resource_cfg_path.resolve())
 
     cfg = Configs()
-    cfg.initialization_configs(r"/Users/mars/PycharmProjects/study/启动器/Naruto_SWF_Reversed/config.yaml")
+    cfg.initialization_configs(r"E:\pythonProject\启动器\config.yaml")
     analyze_tbs_cache_after(cfg)

@@ -3,7 +3,7 @@ resource_url:
   after_keywords: ["flash/core/naruto.core.swf",]
 
 file_manager:
-  resource_save_path: "../essence_resource"
+  resource_save_path: "./essence_resource"
 
 net_work:
   max_connection: 50
