@@ -27,14 +27,14 @@ if __name__ == "__main__":
     # 分析本地tbs缓存得到前置资源
     try:
         tbs_cache_path = os.path.join(essence_dir, "tbs_cache")
-        resource_requirement = analyze_tbs_cache_front(tbs_cache_path, global_config)
+        resource_requirement_font = analyze_tbs_cache_front(tbs_cache_path, global_config)
     except Exception as err:
         logging.error(f"[ERROR] 获取前置资源url表单失败: {err}")
         exit(1)
 
     # 下载前置资源
     try:
-        global_net_client.download_requirement(resource_requirement, global_config.resource_save_path)
+        global_net_client.download_requirement(resource_requirement_font, global_config.resource_save_path)
         logging.info(f"[INFO] 前置资源获取成功, 保存目录: {global_config.resource_save_path}")
     except Exception as err:
         logging.error(f"[ERROR] 获取前置资源文件失败: {err}")
@@ -42,7 +42,14 @@ if __name__ == "__main__":
 
     # 处理后置资源
     try:
-        analyze_tbs_cache_after(global_config)
+        resource_requirement_after = analyze_tbs_cache_after(global_config)
     except Exception as err:
         logging.error(f"[ERROR] 后置资源处理错误: {err}")
+        exit(1)
+
+    # 下载后置资源
+    try:
+        global_net_client.download_requirement(resource_requirement_after, global_config.resource_save_path)
+    except Exception as err:
+        logging.error(f"[ERROR] 获取后置资源文件失败: {err}")
         exit(1)

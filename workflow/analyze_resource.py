@@ -227,7 +227,15 @@ def analyze_tbs_cache_after(cfg: Configs):
 if __name__ == "__main__":
     # print("当前工作目录:", Path.cwd())
     # print("实际查找位置:", resource_cfg_path.resolve())
+    from net import get_net_client
 
     cfg = Configs()
-    cfg.initialization_configs(r"E:\pythonProject\启动器\config.yaml")
-    analyze_tbs_cache_after(cfg)
+    cfg.initialization_configs(r"../config.yaml")
+    resource_requirement = analyze_tbs_cache_after(cfg)
+
+    net_client = get_net_client(cfg)
+
+    try:
+        net_client.download_requirement(resource_requirement, cfg.resource_save_path)
+    except Exception as err:
+        print(f"[ERROR]下载失败: {err}")
