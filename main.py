@@ -41,15 +41,34 @@ if __name__ == "__main__":
         exit(1)
 
     # 处理后置资源
+    # ✅ 创建生成器（不会执行任何代码）
+    gen = analyze_tbs_cache_after(global_config)
+
+    # ✅ 第一次 next() → 执行到 yield，返回 resource_requirement
     try:
-        resource_requirement_after = analyze_tbs_cache_after(global_config)
+        resource_requirement_after = next(gen)
+    except StopIteration:
+        logging.error("[ERROR] 生成器没有返回资源需求")
+        exit(1)
     except Exception as err:
         logging.error(f"[ERROR] 后置资源处理错误: {err}")
         exit(1)
 
-    # 下载后置资源
+    # ✅ 下载后置资源
     try:
         global_net_client.download_requirement(resource_requirement_after, global_config.resource_save_path)
+        logging.info(f"[INFO] 后置资源下载成功")
     except Exception as err:
         logging.error(f"[ERROR] 获取后置资源文件失败: {err}")
+        exit(1)
+
+    # ✅ 第二次 next() → 继续执行 part2（解密）
+    try:
+        next(gen)
+        logging.info("[INFO] 解密完成")
+    except StopIteration:
+        # 生成器正常结束
+        pass
+    except Exception as err:
+        logging.error(f"[ERROR] 解密失败: {err}")
         exit(1)

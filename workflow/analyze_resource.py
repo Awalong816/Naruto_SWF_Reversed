@@ -12,7 +12,7 @@ if project_root not in sys.path:
 
 # 现在可以直接导入
 from config import Configs
-from utils import get_decompress_manager, get_type_reader_manager
+from utils import get_decompress_manager, get_type_reader_manager, get_decrypt_manger
 
 # 筛选url二进制字节段
 # re.compile 包装成对象，使用search方法进行正则匹配
@@ -30,6 +30,7 @@ version_sign = re.compile(
 
 decompress_manager = get_decompress_manager()
 type_reader_manager = get_type_reader_manager()
+decrypt_manager = get_decrypt_manger()
 
 
 def url_tpf_test():
@@ -176,7 +177,7 @@ def analyze_tbs_cache_after(cfg: Configs):
     debug = cfg.debug
     resource_dir = cfg.resource_save_path
 
-    # 分析resource得到core的指向
+    # part1 分析resource得到必要组件的指向
     ## 解压缩
     resource_cfg_path = os.path.join(resource_dir, "resource.cfg")
     resource_cfg_path = Path(resource_cfg_path)
@@ -221,7 +222,14 @@ def analyze_tbs_cache_after(cfg: Configs):
     if debug:
         print(f"resource_requirement: {resource_requirement}")
 
-    return resource_requirement
+    yield resource_requirement
+
+    # part2 解密
+
+    naruto_server_swf_path = os.path.join(cfg.resource_save_path,"flash/server/NarutoServer.swf")
+    # print(f"aim: {naruto_server_swf_path}")
+
+    decrypt_manager.decrypt_file(naruto_server_swf_path, debug)
 
 
 if __name__ == "__main__":

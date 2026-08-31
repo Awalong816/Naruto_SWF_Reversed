@@ -78,15 +78,16 @@ class NarutoServerDecryptManager:
 
         # 前128字节中，奇数位置按位取反
         encrypted_length = min(128, len(data) - p)
-
-        for index in range(p, p + encrypted_length, 2):
-            # 判断索引奇数位置 *注意 and与&不等效, 参考c,go的&&与&的区别
+        # p = 19 == [0]
+        # 由于在块内计算奇偶，所以取出迭代新块更合适
+        for index, val in enumerate(data[p:p+encrypted_length]):
+            # 判断索128块内引奇数位置 *注意 and与&不等效, 参考c,go的&&与&的区别
             if index % 2 == 1:
-                new_p2 = (~data[index]) & 0xFF  # &0xFF: 取反位置会拉长(由语言下的储存类型决定, py的int/float...界限不明, 所以是前导无限位)
+                val = (~val) & 0xFF  # &0xFF: 取反位置会拉长(由语言下的储存类型决定, py的int/float...界限不明, 所以是前导无限位)
                 # **无限高位1的问题，最高位为1视为负数，会取补码(再取反+1)导致成为非数学意义取反**
                 # 例子: 90 = 0101 1010, 数学取反=1010 0101=165, 正负值取反=(-)0101 1011=-91
                 # 还是八位存储不会拉长数据的长度
-                result.append(new_p2)
+            result.append(val)
 
         p += encrypted_length
         result.extend(data[p:])
@@ -95,4 +96,4 @@ class NarutoServerDecryptManager:
 
 
 def get_naruto_server_decrypt_manager():
-    return NarutoServerDecryptManager
+    return NarutoServerDecryptManager()
