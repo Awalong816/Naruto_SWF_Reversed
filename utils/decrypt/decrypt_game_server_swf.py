@@ -43,6 +43,7 @@ class NarutoServerDecryptManager:
         :return: LZMA字节流
         """
         # 筛选
+        # print("进")
         if len(data) < 8:
             return
         else:
@@ -91,6 +92,8 @@ class NarutoServerDecryptManager:
 
         p += encrypted_length
         result.extend(data[p:])
+
+        # print("替换完成")
 
         return bytes(result)
 

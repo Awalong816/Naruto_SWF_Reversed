@@ -239,7 +239,12 @@ if __name__ == "__main__":
 
     cfg = Configs()
     cfg.initialization_configs(r"../config.yaml")
-    resource_requirement = analyze_tbs_cache_after(cfg)
+    gen = analyze_tbs_cache_after(cfg)
+
+    try:
+        resource_requirement = next(gen)
+    except Exception as err:
+        print(f"[ERROR] 后处理 part1 意外错误: {err}")
 
     net_client = get_net_client(cfg)
 
@@ -247,3 +252,10 @@ if __name__ == "__main__":
         net_client.download_requirement(resource_requirement, cfg.resource_save_path)
     except Exception as err:
         print(f"[ERROR]下载失败: {err}")
+
+    try:
+        next(gen)
+    except StopIteration as err:
+        pass
+    except Exception as err:
+        print(f"[ERROR] 后处理 part2 意外错误: {err}")
