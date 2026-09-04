@@ -13,6 +13,10 @@ class Configs:
         self.net_timeout = 60
         # system
         self.debug = False
+        # profile
+        self.zone_id = ""
+        # running_config
+        self.round_part = -1
 
     def initialization_configs(self, config_path="./config.yaml"):
         with open(config_path, "r") as file:
@@ -31,5 +35,8 @@ class Configs:
             # system
             system_cfg = config_dict.get("system", {})
             self.debug = bool(system_cfg.get("debug", False))
+            # profile
+            profile_cfg = config_dict.get("profile", {})
+            self.zone_id = str(profile_cfg.get("zone_id", ""))
 
 

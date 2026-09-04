@@ -3,7 +3,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urlsplit, urlunsplit, parse_qs
 
 # 添加项目根目录到路径
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -66,7 +66,8 @@ def find_url(item, mode, pattern):
                 match_str = match.decode('utf-8', errors="ignore")
                 url_parts = urlsplit(match_str)
                 url_parse = urlunsplit(
-                    (url_parts.scheme, url_parts.netloc, url_parts.path, "", ""))  # 移除请求参数,组成要求固定五个部分
+                    (url_parts.scheme, url_parts.netloc, url_parts.path, url_parts.query, "")
+                )
                 urls.append(url_parse)
 
     elif mode == "bytes":
@@ -74,20 +75,56 @@ def find_url(item, mode, pattern):
             match_str = match.decode('utf-8', errors="ignore")
             url_parts = urlsplit(match_str)
             url_parse = urlunsplit(
-                (url_parts.scheme, url_parts.netloc, url_parts.path, "", ""))  # 移除请求参数,组成要求固定五个部分
+                (url_parts.scheme, url_parts.netloc, url_parts.path, url_parts.query, "")
+            )  # 移除请求参数,组成要求固定五个部分
             urls.append(url_parse)
 
     return list(set(urls))
 
 
-def sift_url(urls: list, keywords):
-    matches = []
+def sift_url(urls: list, keywords) -> dict:
+    matches = {}
     for keyword in keywords:
+        if keyword.startswith("/") and len(keyword) > 1:
+            key = keyword[1:]
+        else:
+            key = keyword
+        matches[key] = []
         for url in urls:
             if keyword in url:
-                matches.append(url)
+                if keyword.startswith("/") and len(keyword) > 1:
+                    key = keyword[1:]
+                else:
+                    key = keyword
+                matches[key].append(url)
 
     return matches
+
+
+def get_round_port(cfg: Configs, method: str, **kwargs):
+    if method == "entry_file":
+        if kwargs.get("url"):
+            url = kwargs.get("url")
+            url_parts = urlsplit(url)
+            if url_parts.query:
+                params = parse_qs(url_parts.query)
+                port = params.get("port", [''])[0]
+                if port:
+                    cfg.round_part = int(port)
+                else:
+                    raise Exception(f"没有找到url的port参数")
+
+
+def _get_timestamp(url: str):
+    url_parts = urlsplit(url)
+    if not url_parts.query:
+        return None
+    params = parse_qs(url_parts.query)
+    timestamp = params.get("time",[''])[0]
+    try:
+        return int(timestamp)
+    except ValueError:
+        return None
 
 
 def _get_version(url: str, debug=False) -> tuple:
@@ -109,7 +146,41 @@ build: {match.group(3)}""")
     return version
 
 
-def _get_latest(urls: list[str], debug=False) -> int:
+def _get_latest(urls: list[str], cfg: Configs, debug=False) -> int:
+    # 筛选区号参数
+    if cfg.zone_id:
+        filtered_urls = []
+
+        for url in urls:
+            # ** for url in urls 本质依旧是索引自增, 所以删除后还是会调到下2个, 也会有范围超过报错风险 **
+            params = parse_qs(urlsplit(url).query)
+            zone_id = params.get("zone_id", [""])[0]
+
+            # 没有区服参数的是 resource.cfg 等资源，继续保留
+            if not zone_id or str(zone_id) == str(cfg.zone_id):
+                filtered_urls.append(url)
+
+        # 原地替换，保证外部 url_list 和这里使用的是同一列表
+        urls[:] = filtered_urls
+
+    if len(urls) <= 0:
+        raise ValueError(f"没有找到指定区服 <{cfg.zone_id}> 相关url")
+
+    # 先判断时间戳
+    last_timestamp = -1
+    latest_url_index = -1
+    for i in range(0, len(urls)):
+        timestamp = _get_timestamp(urls[i])
+        if not timestamp:
+            latest_url_index = -1
+            break
+        if timestamp > last_timestamp:
+            latest_url_index = i
+            last_timestamp = timestamp
+    if latest_url_index >= 0:
+        return latest_url_index
+
+    # 缺失时间戳再判断版本
     versions = []
     for url in urls:
         version = _get_version(url, debug)
@@ -118,24 +189,16 @@ def _get_latest(urls: list[str], debug=False) -> int:
     return versions.index(max(versions))
 
 
-def select_version(urls: list, keywords, debug=False):
-    resource_dict = {}
-
-    for keyword in keywords:
-        if keyword.startswith("/") and len(keyword) > 1:
-            keyword = keyword[1:]
-
-        resource_dict[keyword] = []
-
-        for url in urls:
-            if keyword in url:
-                resource_dict[keyword].append(url)
+def select_latest(urls: dict, cfg: Configs, debug=False):
+    resource_dict = urls
 
     for key, url_list in resource_dict.items():
         if len(url_list) > 1:
-            resource_dict[key] = url_list[_get_latest(url_list, debug)]
-        else:
+            resource_dict[key] = url_list[_get_latest(url_list, cfg, debug)]
+        elif len(url_list) == 1:
             resource_dict[key] = url_list[0]
+        else:
+            pass
 
     return resource_dict
 
@@ -161,9 +224,20 @@ def analyze_tbs_cache_front(tbs_cache_path, cfg: Configs):
     if debug:
         print(f"resource urls:\n{resource_urls}")
 
-    resource_requirement = select_version(resource_urls, keywords, debug)
+    resource_requirement = select_latest(resource_urls, cfg, debug)
     if debug:
         print(f"resource requirement: {resource_requirement}")
+
+    if resource_requirement.get("entry.swf", ""):
+        try:
+            get_round_port(
+                cfg=cfg,
+                method="entry_file",
+                url=resource_requirement.get("entry.swf"),
+            )
+            logging.info(f"[INFO] 找到通信端口: {cfg.round_part}")
+        except Exception as err:
+            logging.warning(f"[WARN] {err}")
 
     return resource_requirement
 
@@ -198,10 +272,20 @@ def analyze_tbs_cache_after(cfg: Configs):
 
     # resource 找 flash.core.swf 索引
     resource_cfg_dict = type_reader_manager.read_bytes(decompressed_data, resource_cfg_data_type)
-    resource_url_list = []
+    resource_urls = {}
+    for keyword in cfg.after_resource_keywords:
+        if keyword.startswith("/") and len(keyword) > 1:
+            key = keyword[1:]
+        else:
+            key = keyword
+        resource_urls[key] = []
 
     for item_name, rule in resource_cfg_dict.items():
         for keyword in cfg.after_resource_keywords:
+            if keyword.startswith("/") and len(keyword) > 1:
+                key = keyword[1:]
+            else:
+                key = keyword
             try:
                 if keyword in rule["url"]:
                     resource_url = urlunsplit([
@@ -211,14 +295,11 @@ def analyze_tbs_cache_after(cfg: Configs):
                         "",
                         "",
                     ])
-                    resource_url_list.append(resource_url)
+                    resource_urls[key].append(resource_url)
             except TypeError:
                 continue
 
-    if len(resource_url_list) < 1:
-        raise ValueError(f"resource文件没有找到 <{cfg.after_resource_keywords}> 记录")
-
-    resource_requirement = select_version(resource_url_list, cfg.after_resource_keywords, debug)
+    resource_requirement = select_latest(resource_urls, cfg, debug)
     if debug:
         print(f"resource_requirement: {resource_requirement}")
 

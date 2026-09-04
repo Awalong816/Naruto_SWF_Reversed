@@ -11,3 +11,6 @@ net_work:
 
 system:
   debug: True
+
+profile:
+  zone_id: 506

@@ -54,21 +54,23 @@ if __name__ == "__main__":
         logging.error(f"[ERROR] 后置资源处理错误: {err}")
         exit(1)
 
-    # ✅ 下载后置资源
-    try:
-        global_net_client.download_requirement(resource_requirement_after, global_config.resource_save_path)
-        logging.info(f"[INFO] 后置资源下载成功")
-    except Exception as err:
-        logging.error(f"[ERROR] 获取后置资源文件失败: {err}")
-        exit(1)
+    # ======= 项目更新用 ========
 
-    # ✅ 第二次 next() → 继续执行 part2（解密）
-    try:
-        next(gen)
-        logging.info("[INFO] 解密完成")
-    except StopIteration:
-        # 生成器正常结束
-        pass
-    except Exception as err:
-        logging.error(f"[ERROR] 解密失败: {err}")
-        exit(1)
+    # # ✅ 下载后置资源
+    # try:
+    #     global_net_client.download_requirement(resource_requirement_after, global_config.resource_save_path)
+    #     logging.info(f"[INFO] 后置资源下载成功")
+    # except Exception as err:
+    #     logging.error(f"[ERROR] 获取后置资源文件失败: {err}")
+    #     exit(1)
+    #
+    # # ✅ 第二次 next() → 继续执行 part2（解密）
+    # try:
+    #     next(gen)
+    #     logging.info("[INFO] 解密完成")
+    # except StopIteration:
+    #     # 生成器正常结束
+    #     pass
+    # except Exception as err:
+    #     logging.error(f"[ERROR] 解密失败: {err}")
+    #     exit(1)
