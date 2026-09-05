@@ -2,7 +2,7 @@ import os
 import logging
 
 from config import Configs
-from workflow import get_qqgamebox_client_path, analyze_tbs_cache_front, analyze_tbs_cache_after
+from workflow import get_qqgamebox_client_path, analyze_tbs_cache_front, analyze_tbs_cache_after, proxy_start
 from net import get_net_client
 
 logging.basicConfig(level=logging.INFO) # 最低播报等级
@@ -32,15 +32,15 @@ if __name__ == "__main__":
         logging.error(f"[ERROR] 获取前置资源url表单失败: {err}")
         exit(1)
 
-    # 下载前置资源
-    try:
-        global_net_client.download_requirement(resource_requirement_font, global_config.resource_save_path)
-        logging.info(f"[INFO] 前置资源获取成功, 保存目录: {global_config.resource_save_path}")
-    except Exception as err:
-        logging.error(f"[ERROR] 获取前置资源文件失败: {err}")
-        exit(1)
-
     # ======= 项目更新用 ========
+
+    # 下载前置资源
+    # try:
+    #     global_net_client.download_requirement(resource_requirement_font, global_config.resource_save_path)
+    #     logging.info(f"[INFO] 前置资源获取成功, 保存目录: {global_config.resource_save_path}")
+    # except Exception as err:
+    #     logging.error(f"[ERROR] 获取前置资源文件失败: {err}")
+    #     exit(1)
 
     #  处理后置资源
     #  ✅ 创建生成器（不会执行任何代码）
@@ -74,3 +74,12 @@ if __name__ == "__main__":
     # except Exception as err:
     #     logging.error(f"[ERROR] 解密失败: {err}")
     #     exit(1)
+
+    # ======= 开始代理 ========
+
+    try:
+        proxy_start(global_config)
+    except Exception as err:
+        logging.error(f"[ERROR] 启动本地代理失败: {err}")
+        exit(1)
+

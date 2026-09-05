@@ -101,7 +101,21 @@ def sift_url(urls: list, keywords) -> dict:
     return matches
 
 
-def get_round_port(cfg: Configs, method: str, **kwargs):
+def get_send_domain(method: str, **kwargs):
+    if method == "entry_file":
+        if kwargs.get("url"):
+            url = kwargs.get("url")
+            url_parts = urlsplit(url)
+            if url_parts.query:
+                params = parse_qs(url_parts.query)
+                domain = params.get("ip", [''])[0]
+                if domain:
+                    return str(domain)
+                else:
+                    raise Exception(f"没有找到url的port参数")
+
+
+def get_send_port(method: str, **kwargs):
     if method == "entry_file":
         if kwargs.get("url"):
             url = kwargs.get("url")
@@ -110,7 +124,7 @@ def get_round_port(cfg: Configs, method: str, **kwargs):
                 params = parse_qs(url_parts.query)
                 port = params.get("port", [''])[0]
                 if port:
-                    cfg.round_part = int(port)
+                    return int(port)
                 else:
                     raise Exception(f"没有找到url的port参数")
 
@@ -230,12 +244,13 @@ def analyze_tbs_cache_front(tbs_cache_path, cfg: Configs):
 
     if resource_requirement.get("entry.swf", ""):
         try:
-            get_round_port(
-                cfg=cfg,
-                method="entry_file",
-                url=resource_requirement.get("entry.swf"),
-            )
-            logging.info(f"[INFO] 找到通信端口: {cfg.round_part}")
+            server_domain = get_send_domain(method="entry_file", url=resource_requirement.get("entry.swf"))
+            cfg.send_server_domain = server_domain
+            logging.info(f"[INFO] 找到接收域名: {cfg.send_server_domain}")
+
+            server_port = get_send_port(method="entry_file", url=resource_requirement.get("entry.swf"))
+            cfg.send_server_part = server_port
+            logging.info(f"[INFO] 找到服务器接收端口: {cfg.send_server_part}")
         except Exception as err:
             logging.warning(f"[WARN] {err}")
 

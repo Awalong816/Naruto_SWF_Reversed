@@ -1,3 +1,4 @@
 from utils.decompress.decompress_manager import get_decompress_manager
 from utils.type_reader.type_reader_manager import get_type_reader_manager
 from utils.decrypt.decrypt_manager import get_decrypt_manger
+from utils.dns_util.dns_manager import get_dns_manager
