@@ -39,6 +39,6 @@ class Configs:
             self.debug = bool(system_cfg.get("debug", False))
             # profile
             profile_cfg = config_dict.get("profile", {})
-            self.zone_id = str(profile_cfg.get("zone_id", ""))
+            self.zone_id = profile_cfg.get("zone_id", "")
 
 
