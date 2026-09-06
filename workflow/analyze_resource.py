@@ -249,8 +249,8 @@ def analyze_tbs_cache_front(tbs_cache_path, cfg: Configs):
             logging.info(f"[INFO] 找到接收域名: {cfg.send_server_domain}")
 
             server_port = get_send_port(method="entry_file", url=resource_requirement.get("entry.swf"))
-            cfg.send_server_part = server_port
-            logging.info(f"[INFO] 找到服务器接收端口: {cfg.send_server_part}")
+            cfg.send_server_prot = server_port
+            logging.info(f"[INFO] 找到服务器接收端口: {cfg.send_server_prot}")
         except Exception as err:
             logging.warning(f"[WARN] {err}")
 

@@ -20,7 +20,7 @@ class Configs:
         # running_config
         self.send_server_domain = ""
         self.send_server_ips = [] # 域名可能挂载多个ip
-        self.send_server_part = -1
+        self.send_server_prot = -1
 
     def initialization_configs(self, config_path="./config.yaml"):
         with open(config_path, "r") as file:
