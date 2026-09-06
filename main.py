@@ -83,3 +83,9 @@ if __name__ == "__main__":
         logging.error(f"[ERROR] 启动本地代理失败: {err}")
         exit(1)
 
+    finally:
+        try:
+            global_net_client.dns_manager.reset_rule_replace(global_config)
+        except Exception as err:
+            logging.warning(f"[WARN] 还原代理规则失败: {err}")
+
