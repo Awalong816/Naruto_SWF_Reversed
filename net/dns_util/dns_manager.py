@@ -1,6 +1,7 @@
 import socket
 import ipaddress
 
+from config import Configs
 
 class DNSManager:
     def __init__(self):
@@ -34,6 +35,12 @@ class DNSManager:
 
         except socket.gaierror:
             return None
+
+    def host_rule_replace(self, cfg: Configs):
+        pass
+
+    def reset_rule_replace(self, cfg: Configs):
+        pass
 
 
 def get_dns_manager():

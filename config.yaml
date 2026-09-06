@@ -10,7 +10,7 @@ net_work:
   timeout: 60
 
 system:
-  debug: False
+  debug: True
 
 profile:
-  zone_id: 506
+  zone_id: 541

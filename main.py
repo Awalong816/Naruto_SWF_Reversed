@@ -2,7 +2,7 @@ import os
 import logging
 
 from config import Configs
-from workflow import get_qqgamebox_client_path, analyze_tbs_cache_front, analyze_tbs_cache_after, proxy_start
+from workflow import get_qqgamebox_client_path, analyze_tbs_cache_front, proxy_start
 from net import get_net_client
 
 logging.basicConfig(level=logging.INFO) # 最低播报等级
@@ -78,7 +78,7 @@ if __name__ == "__main__":
     # ======= 开始代理 ========
 
     try:
-        proxy_start(global_config)
+        proxy_start(global_config, global_net_client)
     except Exception as err:
         logging.error(f"[ERROR] 启动本地代理失败: {err}")
         exit(1)

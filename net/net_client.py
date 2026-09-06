@@ -9,6 +9,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from config import Configs
+from net.dns_util.dns_manager import get_dns_manager
 
 logging.basicConfig(level=logging.INFO) # 最低播报等级
 
@@ -24,6 +25,7 @@ class NetClient:
             http2=True,
             follow_redirects=True, # 允许重定向
         )
+        self.dns_manager = get_dns_manager() # dns模块
 
     def _get(self, url: str, **kwargs):
         response = self.client.get(url, **kwargs)
