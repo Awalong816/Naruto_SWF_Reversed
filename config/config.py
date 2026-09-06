@@ -12,6 +12,7 @@ class Configs:
         self.net_max_connection = 50
         self.net_timeout = 60
         self.net_proxy_host_path = ""
+        self.net_proxy_prot = 10494
         # system
         self.debug = False
         # profile
@@ -40,6 +41,7 @@ class Configs:
             # # proxy
             net_proxy_cfg = net_work_cfg.get("proxy", {})
             self.net_proxy_host_path = net_proxy_cfg.get("host_path", "")
+            self.net_proxy_prot = net_proxy_cfg.get("proxy_prot", 10494)
 
             # system
             system_cfg = config_dict.get("system", {})

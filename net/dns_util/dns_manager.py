@@ -38,7 +38,12 @@ class DNSManager:
             return None
 
     def host_rule_replace(self, cfg: Configs):
-        pass
+        host_mark_start = "# NARUTO PY PROXY BEGIN"
+        host_mark_end = "# NARUTO PY PROXY END"
+
+        # 开始替换
+        domain = cfg.send_server_domain
+        turn_ip = "127.0.0.1"
 
     def reset_rule_replace(self, cfg: Configs):
         pass
