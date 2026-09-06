@@ -1,5 +1,6 @@
 import os
 import logging
+import ctypes
 
 from config import Configs
 from workflow import get_qqgamebox_client_path, analyze_tbs_cache_front, proxy_start
@@ -7,12 +8,26 @@ from net import get_net_client
 
 logging.basicConfig(level=logging.INFO) # 最低播报等级
 
+
+def is_admin(debug=False):
+    try:
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception as err:
+        if debug:
+            print(f"管理员权限无法判断: {err}")
+        return False
+
+
 if __name__ == "__main__":
     # 初始化全局配置
     global_config = Configs()
     global_config.initialization_configs()
 
     global_net_client = get_net_client(global_config)
+    # 鉴权
+    if not is_admin(global_config.debug):
+        logging.error(f"[ERROR] 鉴权失败, 使用管理员身份重新打开")
+        exit(1)
 
     # 获取游戏本体本地目录
     try:

@@ -1,3 +1,4 @@
+import ctypes
 import socket
 import ipaddress
 
@@ -50,4 +51,3 @@ def get_dns_manager():
 if __name__ == "__main__":
     manager = get_dns_manager()
     domain = "zone.huoying.qq.com"
-    manager.domain2ip(domain)

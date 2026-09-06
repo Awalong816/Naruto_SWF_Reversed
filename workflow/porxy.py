@@ -16,6 +16,8 @@ def proxy_start(cfg: Configs, net_client: NetClient):
     :param cfg: 运行配置
     :return:
     """
+    debug = cfg.debug
+
     try:
         save_real_ips(cfg, net_client)
         logging.info(f"[INFO] 得到域名挂载ip组: {cfg.send_server_ips}")
