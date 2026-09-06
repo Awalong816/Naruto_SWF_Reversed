@@ -11,6 +11,7 @@ class Configs:
         # net_work
         self.net_max_connection = 50
         self.net_timeout = 60
+        self.net_proxy_host_path = ""
         # system
         self.debug = False
         # profile
@@ -27,16 +28,23 @@ class Configs:
             resource_url_cfg = config_dict.get("resource_url", {})
             self.font_resource_keywords = list(resource_url_cfg.get("font_keywords", []))
             self.after_resource_keywords = list(resource_url_cfg.get("after_keywords", []))
+
             # file_manager
             file_manager_cfg = config_dict.get("file_manager", {})
             self.resource_save_path = str(file_manager_cfg.get("resource_save_path", "../essence_resource"))
+
             # net_work
             net_work_cfg = config_dict.get("net_work", {})
             self.net_max_connection = int(net_work_cfg.get("max_connection", 50))
             self.net_timeout = int(net_work_cfg.get("timeout", 60))
+            # # proxy
+            net_proxy_cfg = net_work_cfg.get("proxy", {})
+            self.net_proxy_host_path = net_proxy_cfg.get("host_path", "")
+
             # system
             system_cfg = config_dict.get("system", {})
             self.debug = bool(system_cfg.get("debug", False))
+
             # profile
             profile_cfg = config_dict.get("profile", {})
             self.zone_id = profile_cfg.get("zone_id", "")

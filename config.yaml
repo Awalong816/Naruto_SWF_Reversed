@@ -8,6 +8,8 @@ file_manager:
 net_work:
   max_connection: 50
   timeout: 60
+  proxy:
+    host_path: 'C:\Windows\System32\drivers\etc\hosts'
 
 system:
   debug: True
