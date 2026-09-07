@@ -2,8 +2,10 @@ import logging
 import os
 import re
 import sys
+import time
+import json
 from pathlib import Path
-from urllib.parse import urlsplit, urlunsplit, parse_qs
+from urllib.parse import urlsplit, urlunsplit, urljoin, urlencode, parse_qs
 
 # 添加项目根目录到路径
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -12,6 +14,7 @@ if project_root not in sys.path:
 
 # 现在可以直接导入
 from config import Configs
+from net import NetClient
 from utils import get_decompress_manager, get_type_reader_manager, get_decrypt_manger
 
 # 筛选url二进制字节段
@@ -20,6 +23,11 @@ from utils import get_decompress_manager, get_type_reader_manager, get_decrypt_m
 # [...] 匹配其中任意一个字符
 # `]` 需要转义成`\]`否则视为结束
 # ]后的`+`表示匹配一个或多个
+server_version_tpf = re.compile(
+    r'var\s+(flash|version|assets|config)\s*='
+    r'\s*["\']([^"\']+)["\']'
+)
+
 url_tpf = re.compile(
     rb"https?://[A-Za-z0-9._~:/?#[\]@!$&()*+,;=%-]+"
 )
@@ -217,6 +225,111 @@ def select_latest(urls: dict, cfg: Configs, debug=False):
     return resource_dict
 
 
+def analyze_from_server(cfg: Configs, client: NetClient):
+    debug = cfg.debug
+    timestamp = int(time.time() * 1000)
+    request_url = urljoin(cfg.game_server_baseURL, cfg.resource_server_router)
+    zone_id = cfg.zone_id
+    if not zone_id:
+        raise ValueError(f"主动请求服务器资源需要`zone_id`")
+    try:
+        zone_id = int(zone_id)
+    except ValueError as err:
+        raise ValueError(f"运行配置-`zone_id`无效")
+    except Exception as err:
+        raise Exception(f"`zone_id`意外错误: {err}")
+
+    try:
+        # 获得跳转url
+        if debug:
+            print(f"请求url: {request_url}")
+        response = client.get(
+            url=request_url,
+            params={
+                "svr_id": zone_id,
+            },
+            timeout=15
+        )
+        data = response.decode('utf-8')
+        data_json = json.loads(data)
+        if len(data_json) < 4:
+            raise ValueError(
+                f"资源服务返回格式不正确: {data_json}"
+            )
+        game_host = data_json[0] # 游戏服务器: 登录角色，游戏指令...
+        game_port = int(data_json[1]) # 服务器接收端口
+        resource_host = data_json[2] # https资源目录服务器: 负责下载组件
+        version_file = data_json[3]
+
+        cfg.send_server_domain = game_host
+        cfg.send_server_prot = game_port
+
+        # 获得最新版entry.swf和resource.cfg
+        resource_requirement = {
+            "entry.swf": "",
+            "resource.cfg": "",
+        }
+        version_url = urljoin(cfg.game_server_baseURL, version_file)
+        version_response = client.get(
+            url=version_url,
+            params={
+                "_": timestamp
+            },
+            timeout=15
+        )
+
+        version_text = version_response.decode('utf-8')
+        versions = dict(
+            server_version_tpf.findall(version_text)
+        )
+        # entry.swf
+        flash_version = versions.get("flash")
+        if not flash_version:
+            raise ValueError(
+                "version.js中没有找到flash版本"
+            )
+        # entry文件本身的地址
+        entry_base_url = (
+            f"{resource_host.rstrip('/')}/"
+            f"{flash_version}/entry.swf"
+        )
+
+        # 传给entry.swf的运行参数
+        entry_params = {
+            "zone_id": str(zone_id),
+            "time": str(timestamp),
+            "ip": game_host,
+            "host": resource_host,
+            "port": str(game_port),
+            "source": "qqgame",
+            "rd": "",
+            "baseURL": cfg.game_server_baseURL,
+            "via": "null",
+            "ADTAG": "null",
+        }
+        entry_url = (
+            entry_base_url
+            + "?"
+            + urlencode(entry_params)
+        )
+
+        # resource.cfg
+        server_resource_cfg_url = (
+            f"{resource_host.rstrip('/')}/"
+            f"{flash_version}/resource.cfg"
+        )
+
+        resource_requirement["entry.swf"] = entry_url
+        resource_requirement["resource.cfg"] = server_resource_cfg_url
+
+        if debug:
+            print(f"resource requirement: {resource_requirement}")
+        return resource_requirement
+
+    except Exception as err:
+        raise f"主动请求资源url中途失败: {err}"
+
+
 def analyze_tbs_cache_front(tbs_cache_path, cfg: Configs):
     """
     # 前置文件总方法 (本地缓存)
@@ -246,11 +359,9 @@ def analyze_tbs_cache_front(tbs_cache_path, cfg: Configs):
         try:
             server_domain = get_send_domain(method="entry_file", url=resource_requirement.get("entry.swf"))
             cfg.send_server_domain = server_domain
-            logging.info(f"[INFO] 找到接收域名: {cfg.send_server_domain}")
 
             server_port = get_send_port(method="entry_file", url=resource_requirement.get("entry.swf"))
             cfg.send_server_prot = server_port
-            logging.info(f"[INFO] 找到服务器接收端口: {cfg.send_server_prot}")
         except Exception as err:
             logging.warning(f"[WARN] {err}")
 

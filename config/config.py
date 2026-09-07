@@ -4,6 +4,8 @@ import yaml
 class Configs:
     def __init__(self):
         # resource_url
+        self.game_server_baseURL = ""
+        self.resource_server_router = ""
         self.font_resource_keywords = []
         self.after_resource_keywords = []
         # file_manager
@@ -27,8 +29,14 @@ class Configs:
             config_dict = dict(yaml.safe_load(file))
             # resource_url
             resource_url_cfg = config_dict.get("resource_url", {})
-            self.font_resource_keywords = list(resource_url_cfg.get("font_keywords", []))
-            self.after_resource_keywords = list(resource_url_cfg.get("after_keywords", []))
+            # # server_get
+            server_get_cfg = resource_url_cfg.get("server_get", {})
+            self.game_server_baseURL = server_get_cfg.get("game_base_url", "")
+            self.resource_server_router = server_get_cfg.get("router", "")
+            # # cache_file
+            cache_file_cfg = resource_url_cfg.get("cache_file", {})
+            self.font_resource_keywords = list(cache_file_cfg.get("font_keywords", []))
+            self.after_resource_keywords = list(cache_file_cfg.get("after_keywords", []))
 
             # file_manager
             file_manager_cfg = config_dict.get("file_manager", {})

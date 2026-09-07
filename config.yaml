@@ -1,6 +1,10 @@
 resource_url:
-  font_keywords: ["/entry.swf", "/resource.cfg"]
-  after_keywords: ["flash/core/naruto.core.swf", "flash/core/naruto.include.swf", "flash/server/NarutoServer.swf"]
+  server_get:
+    game_base_url: "https://game.huoying.qq.com"
+    router: "fcgi-bin/query_svr_info.fcgi"
+  cache_file:
+    font_keywords: [ "/entry.swf", "/resource.cfg" ]
+    after_keywords: [ "flash/core/naruto.core.swf", "flash/core/naruto.include.swf", "flash/server/NarutoServer.swf" ]
 
 file_manager:
   resource_save_path: "./essence_resource"
@@ -16,4 +20,4 @@ system:
   debug: True
 
 profile:
-  zone_id:
+  zone_id: 541

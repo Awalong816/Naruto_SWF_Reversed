@@ -27,7 +27,7 @@ class NetClient:
         )
         self.dns_manager = get_dns_manager() # dns模块
 
-    def _get(self, url: str, **kwargs):
+    def get(self, url: str, **kwargs):
         response = self.client.get(url, **kwargs)
         if response.is_success:
             data = response.content
@@ -44,7 +44,7 @@ class NetClient:
 
         for file_name, url in requirement.items():
             try:
-                file_data = self._get(url)
+                file_data = self.get(url)
                 file_path = save_dir / file_name  # 路径拼接
 
                 # 确保父目录存在
