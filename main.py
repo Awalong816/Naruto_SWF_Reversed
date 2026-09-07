@@ -90,6 +90,10 @@ socket_flow = """
 
 
 if __name__ == "__main__":
+    # url的关系:
+    # game.huoying.qq.com: 负责登录录入信息页面，查询区服信息，返回游戏该从哪里进行通信和版本文件 ↓ 大门
+    # zone.huoying.qq.com: 游戏业务服务器， 用于登录角色，收发游戏指令，数据 *关键* 师傅
+    # res.huoying.qq.com: 静态资源服务器，提下载地址 ↑ 工具箱
 
     # 初始化全局配置
     global_config = Configs()
