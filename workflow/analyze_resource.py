@@ -327,7 +327,7 @@ def analyze_from_server(cfg: Configs, client: NetClient):
         return resource_requirement
 
     except Exception as err:
-        raise f"主动请求资源url中途失败: {err}"
+        raise RuntimeError("主动请求资源url中途失败: {err}")
 
 
 def analyze_tbs_cache_front(tbs_cache_path, cfg: Configs):

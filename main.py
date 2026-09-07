@@ -101,10 +101,11 @@ if __name__ == "__main__":
         logging.error(f"[ERROR] 鉴权失败, 使用管理员身份重新打开")
         exit(1)
 
-    # 1.1 先主动获取资源和服务器信息
+    # ======= 1.1 先主动获取资源和服务器信息 =======
     try:
         resource_requirement = analyze_from_server(global_config, global_net_client)
     except Exception as err:
+        # 1.2 失败后从本地获取
         logging.warning(f"[WARN] {err}\n转为本地缓存文件获取...")
         # 获取游戏本体本地目录
         try:
@@ -123,7 +124,6 @@ if __name__ == "__main__":
         except Exception as err:
             logging.error(f"[ERROR] 获取前置资源url表单失败: {err}")
             exit(1)
-
 
         # ======= 项目更新用 ========
 
@@ -170,7 +170,7 @@ if __name__ == "__main__":
         #
         # resource_requirement = resource_requirement_font | resource_requirement_after
 
-    # ======= 开始代理 ========
+    # ======= 2.开始代理 ========
 
     try:
         proxy_start(global_config, global_net_client)
