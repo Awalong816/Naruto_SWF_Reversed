@@ -14,6 +14,7 @@ class ProxyManager:
         # windows
         if os_type == "windows":
             try:
+                # 位置
                 result = sub.run(
                     ['winget', 'list', '--id', 'InterceptSuite.ProxyBridge', '--exact'],
                     capture_output=True,
@@ -66,7 +67,7 @@ class ProxyManager:
 
                 for path in possible_paths:
                     if path and Path(path).is_file():
-                        cli_path = Path(path).resolve()
+                        cli_path = Path(path).resolve() # 绝对路径
                         break
 
                 if cli_path is None:
@@ -76,7 +77,7 @@ class ProxyManager:
                     return False
             except Exception as err:
                 logging.error(f"[ERROR] proxy-bridge 检查失败: {err}")
-
+            # 检查可用性
             core_path = cli_path.parent / "ProxyBridgeCore.dll"
 
             if not core_path.is_file():
