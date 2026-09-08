@@ -17,6 +17,7 @@ def is_admin(debug=False):
             print(f"管理员权限无法判断: {err}")
         return False
 
+
 socket_flow = """
 1. 快捷方式启动 Launch.exe
    参数：/appid:1103286479
@@ -174,6 +175,14 @@ if __name__ == "__main__":
         #
         # resource_requirement = resource_requirement_font | resource_requirement_after
 
+    # 最后检查
+    if global_config.send_server_domain and global_config.send_server_prot >= 0:
+        logging.info(f"[INFO] 找到游戏服务器域名: {global_config.send_server_domain}")
+        logging.info(f"[INFO] 找到游戏服务器接收端口: {global_config.send_server_prot}")
+    else:
+        logging.error(f"[ERROR] 前置条件缺失,无法继续运行")
+        exit(1)
+
     # ======= 2.开始代理 ========
 
     try:
@@ -182,13 +191,6 @@ if __name__ == "__main__":
         logging.error(f"[ERROR] 启动本地代理失败: {err}")
         exit(1)
 
-    # 最后检查
-    if global_config.send_server_domain and global_config.send_server_prot >= 0 and len(global_config.send_server_ips) > 0:
-        logging.info(f"[INFO] 找到游戏服务器域名: {global_config.send_server_domain}")
-        logging.info(f"[INFO] 找到游戏服务器接收端口: {global_config.send_server_prot}")
-        logging.info(f"[INFO] 得出游戏服务器域名挂载IP组: {global_config.send_server_ips}")
-    else:
-        logging.error(f"[ERROR] 前置条件缺失,无法继续运行")
-        exit(1)
+
 
 

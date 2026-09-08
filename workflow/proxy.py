@@ -18,9 +18,10 @@ def proxy_start(cfg: Configs, net_client: NetClient):
     """
     debug = cfg.debug
 
+    # 兜底
     try:
         save_real_ips(cfg, net_client)
         logging.info(f"[INFO] 得到域名挂载ip组: {cfg.send_server_ips}")
     except Exception as err:
-        raise f"保存域名ip组失败: {err}"
+        logging.warning(f"[WARN] 保存域名ip组失败: {err}")
 

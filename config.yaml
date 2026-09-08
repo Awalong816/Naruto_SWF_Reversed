@@ -17,6 +17,7 @@ net_work:
     proxy_prot:
 
 system:
+  os: "mac"
   debug: True
 
 profile:

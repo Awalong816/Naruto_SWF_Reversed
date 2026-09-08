@@ -16,6 +16,7 @@ class Configs:
         self.net_proxy_host_path = ""
         self.net_proxy_prot = 10494
         # system
+        self.os_type = ""
         self.debug = False
         # profile
         self.zone_id = ""
@@ -53,6 +54,7 @@ class Configs:
 
             # system
             system_cfg = config_dict.get("system", {})
+            self.os_type = system_cfg.get("os", "windows")
             self.debug = bool(system_cfg.get("debug", False))
 
             # profile
