@@ -18,6 +18,13 @@ class ProxyManager:
                 )
                 if result.returncode != 0:
                     logging.warning("[WARN] proxy-bridge 未安装")
+                    install_ans = input("是否由工作流自动安装`proxy-bridge`?(y/n):")
+                    if install_ans.lower() != "y":
+                        logging.info("[INFO] 开始自动安装 proxy-bridge...")
+                    elif install_ans.lower() == "n":
+                        pass
+                    else:
+                        raise ValueError("输入非法")
                 elif result.returncode == 0 and result.stdout:
                     logging.info("[INFO] proxy-bridge 已安装")
                     return True
