@@ -17,7 +17,7 @@ class ProxyManager:
         elif os_type in ["mac", "macos", "darwin"]:
             return self._check_macos()
         else:
-            logging.error(f"不支持的系统: {os_type}")
+            logging.error(f"[ERROR] 不支持的系统: {os_type}")
             return False
 
     def _check_windows(self) -> bool:
@@ -30,7 +30,7 @@ class ProxyManager:
         # 2. 查找 CLI 路径
         cli_path = self._find_cli_windows()
         if not cli_path:
-            logging.error("找不到 ProxyBridge_CLI.exe")
+            logging.error("[ERROR] 找不到 ProxyBridge_CLI.exe")
             return False
 
         # 3. 验证可用性
@@ -38,7 +38,7 @@ class ProxyManager:
             return False
 
         self.proxy_bridge_path = cli_path
-        logging.info(f"✅ ProxyBridge 就绪: {cli_path}")
+        logging.info(f"[INFO] ✅ ProxyBridge 就绪: {cli_path}")
         return True
 
     def _is_installed_windows(self) -> bool:
@@ -55,7 +55,7 @@ class ProxyManager:
 
     def _install_windows(self) -> bool:
         """安装 ProxyBridge"""
-        logging.warning("ProxyBridge 未安装")
+        logging.warning("[WARN] ProxyBridge 未安装")
         ans = input("是否自动安装? (y/n): ").strip().lower()
 
         if ans != 'y':
@@ -74,10 +74,10 @@ class ProxyManager:
         )
 
         if result.returncode == 0:
-            logging.info("✅ 安装成功")
+            logging.info("[INFO] ✅ 安装成功")
             return True
         else:
-            logging.error(f"安装失败: {result.stderr}")
+            logging.error(f"[ERROR] 安装失败: {result.stderr}")
             return False
 
     def _find_cli_windows(self):
@@ -104,7 +104,7 @@ class ProxyManager:
         # 检查依赖文件
         dll_path = cli_path.parent / "ProxyBridgeCore.dll"
         if not dll_path.is_file():
-            logging.error(f"缺少 ProxyBridgeCore.dll")
+            logging.error(f"[ERROR] 缺少 ProxyBridgeCore.dll")
             return False
 
         # 运行版本检查
@@ -116,13 +116,13 @@ class ProxyManager:
                 timeout=10
             )
             if result.returncode == 0:
-                logging.info(f"版本: {result.stdout.strip() or '未知'}")
+                logging.info(f"[INFO] 版本: {result.stdout.strip() or '未知'}")
                 return True
             else:
-                logging.error(f"运行异常: {result.stderr}")
+                logging.error(f"[ERROR] 运行异常: {result.stderr}")
                 return False
         except Exception as e:
-            logging.error(f"启动检查失败: {e}")
+            logging.error(f"[ERROR] 启动检查失败: {e}")
             return False
 
     def _check_macos(self) -> bool:
@@ -135,15 +135,15 @@ class ProxyManager:
 
         for path in app_paths:
             if path.exists():
-                logging.info(f"✅ ProxyBridge 已安装: {path}")
+                logging.info(f"[INFO] ✅ ProxyBridge 已安装: {path}")
                 # 尝试查找 CLI
                 cli_path = path / "Contents/MacOS/proxybridge-cli"
                 if cli_path.exists():
                     self.proxy_bridge_path = str(cli_path)
                 return True
 
-        logging.warning("❌ ProxyBridge 未安装")
-        logging.info("请手动安装: brew install --cask proxybridge")
+        logging.warning("[WARN] ProxyBridge 未安装")
+        logging.info("[INFO] 请手动安装: brew install --cask proxybridge")
         return False
 
 
