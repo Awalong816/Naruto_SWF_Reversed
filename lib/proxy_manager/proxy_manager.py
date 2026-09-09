@@ -1,147 +1,153 @@
-import subprocess as sub # 指令运行
-import os
+import subprocess as sub
 import shutil
 import logging
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO)
 
+
 class ProxyManager:
     def __init__(self):
-        self.proxy_bridge_path = ""
+        self.proxy_bridge_path = None
 
     def check_proxy_bridge(self, os_type="windows") -> bool:
-        # windows
-        if os_type == "windows":
-            try:
-                # 位置
-                result = sub.run(
-                    ['winget', 'list', '--id', 'InterceptSuite.ProxyBridge', '--exact'],
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                    encoding='utf-8',
-                    errors='ignore'
-                )
-                if result.returncode != 0:
-                    logging.warning("[WARN] proxy-bridge 未安装")
-                    install_ans = input("是否由工作流自动安装`proxy-bridge`?(y/n):")
-                    # print(type(install_ans))
-                    if install_ans.lower() == "y":
-                        logging.info("[INFO] 开始自动安装 proxy-bridge...")
-                        result = sub.run(
-                            [
-                                'winget', 'install',
-                                '--id', 'InterceptSuite.ProxyBridge',
-                                '--exact',
-                                '--accept-package-agreements',  # ✅ 自动接受包协议
-                                '--accept-source-agreements',  # ✅ 自动接受源协议
-                                '--silent'  # ✅ 静默安装（可选）
-                            ],
-                            capture_output=True,
-                            text=True,
-                            timeout=300,  # 增加到5分钟
-                            encoding='utf-8',
-                            errors='ignore'
-                        )
-                        if result.returncode == 0 and result.stdout:
-                            logging.info("[INFO] proxy-bridge 安装成功")
-                        else:
-                            logging.error(f"[ERROR] proxy-bridge 安装失败: {result.stderr}")
-                            return False
-                    elif install_ans.lower() == "n":
-                        return False
-                    else:
-                        raise ValueError("输入非法")
-                elif result.returncode == 0 and result.stdout:
-                    logging.info("[INFO] proxy-bridge 已安装")
-
-                possible_paths = [
-                    shutil.which("ProxyBridge_CLI.exe"),
-                    Path(
-                        os.environ.get("ProgramFiles", r"C:\Program Files")
-                    ) / "ProxyBridge" / "ProxyBridge_CLI.exe",
-                ]
-
-                cli_path = None
-
-                for path in possible_paths:
-                    if path and Path(path).is_file():
-                        cli_path = Path(path).resolve() # 绝对路径
-                        break
-
-                if cli_path is None:
-                    logging.warning(
-                        "[WARN] 找不到ProxyBridge_CLI.exe"
-                    )
-                    return False
-            except Exception as err:
-                logging.error(f"[ERROR] proxy-bridge 检查失败: {err}")
-            # 检查可用性
-            core_path = cli_path.parent / "ProxyBridgeCore.dll"
-
-            if not core_path.is_file():
-                logging.warning(
-                    f"[WARN] 缺少ProxyBridgeCore.dll: {core_path}"
-                )
-                return False
-
-            try:
-                result = sub.run(
-                    [str(cli_path), "--version"],
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                    errors="ignore",
-                )
-            except Exception as err:
-                logging.error(
-                    f"[ERROR] ProxyBridge启动检查失败: {err}"
-                )
-                return False
-
-            if result.returncode != 0:
-                logging.error(
-                    f"[ERROR] ProxyBridge运行异常:\n"
-                    f"{result.stdout}\n{result.stderr}"
-                )
-                return False
-
-            self.proxy_bridge_path = str(cli_path)
-
-            version = result.stdout.strip() or "版本未知"
-
-            logging.info(
-                f"[INFO] ProxyBridge依赖正常\n"
-                f"路径: {cli_path}\n"
-                f"版本: {version}"
-            )
-
-            return True
-        # mac
-        elif os_type == "mac" or os_type.lower() == "macos":
-            try:
-                app_paths = [
-                    Path("/Applications/ProxyBridge.app"),
-                    Path.home() / "Applications/ProxyBridge.app",
-                    Path("/opt/homebrew/Caskroom/proxybridge"),  # Homebrew 安装位置
-                ]
-                for app_path in app_paths:
-                    if app_path.exists():
-                        logging.info(f"[INFO] proxy-bridge 已安装")
-                        return True
-                logging.warning(f"[WARN] 暂不提供mac系统自动下载, 需要手动安装 proxy-bridge")
-                logging.error(f"[ERROR] proxy-bridge 未安装")
-            except Exception as err:
-                logging.error(f"[ERROR] proxy-bridge 检查失败: {err}")
-
+        """检查并安装 ProxyBridge"""
+        if os_type in ["windows", "win"]:
+            return self._check_windows()
+        elif os_type in ["mac", "macos", "darwin"]:
+            return self._check_macos()
         else:
-            logging.error(f"[ERROR]不支持代理系统: {os_type}")
+            logging.error(f"不支持的系统: {os_type}")
+            return False
 
+    def _check_windows(self) -> bool:
+        """Windows 检查"""
+        # 1. 快速检查是否已安装
+        if not self._is_installed_windows():
+            if not self._install_windows():
+                return False
+
+        # 2. 查找 CLI 路径
+        cli_path = self._find_cli_windows()
+        if not cli_path:
+            logging.error("找不到 ProxyBridge_CLI.exe")
+            return False
+
+        # 3. 验证可用性
+        if not self._verify_cli(cli_path):
+            return False
+
+        self.proxy_bridge_path = cli_path
+        logging.info(f"✅ ProxyBridge 就绪: {cli_path}")
+        return True
+
+    def _is_installed_windows(self) -> bool:
+        """检查是否已安装"""
+        result = sub.run(
+            ['winget', 'list', '--id', 'InterceptSuite.ProxyBridge', '--exact'],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            encoding='utf-8',
+            errors='ignore'
+        )
+        return result.returncode == 0
+
+    def _install_windows(self) -> bool:
+        """安装 ProxyBridge"""
+        logging.warning("ProxyBridge 未安装")
+        ans = input("是否自动安装? (y/n): ").strip().lower()
+
+        if ans != 'y':
+            logging.info("跳过安装")
+            return False
+
+        logging.info("正在安装...")
+        result = sub.run(
+            ['winget', 'install', '--id', 'InterceptSuite.ProxyBridge',
+             '--exact', '--silent', '--accept-package-agreements'],
+            capture_output=True,
+            text=True,
+            timeout=300,
+            encoding='utf-8',
+            errors='ignore'
+        )
+
+        if result.returncode == 0:
+            logging.info("✅ 安装成功")
+            return True
+        else:
+            logging.error(f"安装失败: {result.stderr}")
+            return False
+
+    def _find_cli_windows(self):
+        """查找 CLI 路径"""
+        # 方法1: 在 PATH 中查找
+        cli_path = shutil.which("ProxyBridge_CLI.exe")
+        if cli_path:
+            return Path(cli_path)
+
+        # 方法2: 检查常见安装位置
+        common_paths = [
+            Path(r"C:\Program Files\ProxyBridge\ProxyBridge_CLI.exe"),
+            Path(r"C:\Program Files (x86)\ProxyBridge\ProxyBridge_CLI.exe"),
+        ]
+
+        for path in common_paths:
+            if path.is_file():
+                return path
+
+        return None
+
+    def _verify_cli(self, cli_path: Path) -> bool:
+        """验证 CLI 可用性"""
+        # 检查依赖文件
+        dll_path = cli_path.parent / "ProxyBridgeCore.dll"
+        if not dll_path.is_file():
+            logging.error(f"缺少 ProxyBridgeCore.dll")
+            return False
+
+        # 运行版本检查
+        try:
+            result = sub.run(
+                [str(cli_path), "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode == 0:
+                logging.info(f"版本: {result.stdout.strip() or '未知'}")
+                return True
+            else:
+                logging.error(f"运行异常: {result.stderr}")
+                return False
+        except Exception as e:
+            logging.error(f"启动检查失败: {e}")
+            return False
+
+    def _check_macos(self) -> bool:
+        """macOS 检查"""
+        # 检查常见安装路径
+        app_paths = [
+            Path("/Applications/ProxyBridge.app"),
+            Path.home() / "Applications/ProxyBridge.app",
+        ]
+
+        for path in app_paths:
+            if path.exists():
+                logging.info(f"✅ ProxyBridge 已安装: {path}")
+                # 尝试查找 CLI
+                cli_path = path / "Contents/MacOS/proxybridge-cli"
+                if cli_path.exists():
+                    self.proxy_bridge_path = str(cli_path)
+                return True
+
+        logging.warning("❌ ProxyBridge 未安装")
+        logging.info("请手动安装: brew install --cask proxybridge")
         return False
 
 
 if __name__ == "__main__":
     os_type = "windows"
-    proxy_manager = ProxyManager()
-    proxy_manager.check_proxy_bridge(os_type)
+    pm = ProxyManager()
+    pm.check_proxy_bridge(os_type)
