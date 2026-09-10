@@ -5,6 +5,7 @@ import ctypes
 from config import Configs
 from workflow import get_qqgamebox_client_path, analyze_from_server, analyze_tbs_cache_front, proxy_start
 from net import get_net_client
+from lib import get_proxy_manager
 
 logging.basicConfig(level=logging.INFO) # 最低播报等级
 
@@ -101,6 +102,7 @@ if __name__ == "__main__":
     global_config.initialization_configs()
 
     global_net_client = get_net_client(global_config)
+    proxy_manger = get_proxy_manager(global_config.os_type)
     # 鉴权
     if not is_admin(global_config.debug):
         logging.error(f"[ERROR] 鉴权失败, 使用管理员身份重新打开")
@@ -190,6 +192,11 @@ if __name__ == "__main__":
     except Exception as err:
         logging.error(f"[ERROR] 启动本地代理失败: {err}")
         exit(1)
+
+    # ======= 退出清理 ========
+
+    finally:
+        proxy_manger.close()
 
 
 

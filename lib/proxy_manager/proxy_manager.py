@@ -1,3 +1,4 @@
+import signal
 import subprocess as sub # 指令运行
 import os
 import shutil
@@ -7,12 +8,14 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 
 class ProxyManager:
-    def __init__(self):
+    def __init__(self, os_type: str):
+        self.os_type = os_type
         self.proxy_bridge_path = ""
+        self.proxy_handle = None
 
-    def check_proxy_bridge(self, os_type="windows") -> bool:
+    def check_proxy_bridge(self) -> bool:
         # windows
-        if os_type == "windows":
+        if self.os_type == "windows":
             try:
                 # 位置
                 result = sub.run(
@@ -119,7 +122,7 @@ class ProxyManager:
 
             return True
         # mac
-        elif os_type == "mac" or os_type.lower() == "macos":
+        elif self.os_type == "mac" or os_type.lower() == "macos":
             try:
                 app_paths = [
                     Path("/Applications/ProxyBridge.app"),
@@ -140,8 +143,78 @@ class ProxyManager:
 
         return False
 
+    def start(self, cfg_path="./.pbprofile"):
+        if self.os_type == "windows":
+            if not self.proxy_bridge_path:
+                logging.error("[ERROR] ProxyBridge 路径未设置，请先调用 check_proxy_bridge")
+                return False
+            cfg_file = Path(cfg_path)
+            if not cfg_file.is_file():
+                logging.error(f"[ERROR] ProxyBridge 配置文件不存在: {cfg_path}")
+                return False
+
+            try:
+                # 启动 ProxyBridge CLI，加载配置文件
+                # --verbose 2 表示输出连接事件日志
+                cmd = [
+                    self.proxy_bridge_path,
+                    "--profile", str(cfg_file.resolve()),
+                    "--verbose", "2"
+                ]
+
+                logging.info(f"[INFO] 启动 ProxyBridge: {' '.join(cmd)}")
+
+                # 使用 Popen 后台启动，不阻塞当前进程
+                self.proxy_handle = sub.Popen(
+                    cmd,
+                    stdout=sub.PIPE,
+                    stderr=sub.PIPE,
+                    text=True,
+                    encoding='utf-8',
+                    errors='ignore',
+                    # Windows 下创建新进程组，方便后续管理
+                    creationflags=sub.CREATE_NEW_PROCESS_GROUP
+                )
+
+                logging.info("[INFO] ProxyBridge 已启动")
+                return True
+
+            except Exception as err:
+                logging.error(f"[ERROR] 启动失败: {err}")
+                return False
+
+    def close(self):
+        if self.os_type == "windows":
+            if not self.proxy_handle:
+                logging.warning("[WARN] 没有正在运行的 ProxyBridge 进程")
+                return
+
+            try:
+                # 发送 Ctrl+C 信号，让程序优雅退出并清理规则
+                self.proxy_handle.send_signal(signal.CTRL_C_EVENT)
+                logging.info("[INFO] 已发送停止信号")
+
+                # 等待进程退出
+                self.proxy_handle.wait(timeout=5)
+                logging.info("[INFO] ProxyBridge 已关闭")
+
+            except sub.TimeoutExpired:
+                # 超时未退出，强制终止
+                logging.warning("[WARN] ProxyBridge 关闭超时，强制终止")
+                self.proxy_handle.terminate()
+                self.proxy_handle.wait(timeout=3)
+
+            except Exception as err:
+                logging.error(f"[ERROR] ProxyBridge 关闭失败: {err}")
+            finally:
+                self.proxy_handle = None
+
+
+def get_proxy_manager(os_type: str="windows"):
+    return ProxyManager(os_type)
+
 
 if __name__ == "__main__":
     os_type = "windows"
-    proxy_manager = ProxyManager()
-    proxy_manager.check_proxy_bridge(os_type)
+    proxy_manager = ProxyManager(os_type)
+    proxy_manager.check_proxy_bridge()

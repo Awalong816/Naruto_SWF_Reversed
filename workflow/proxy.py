@@ -2,6 +2,7 @@ import logging
 
 from config import Configs
 from net.net_client import NetClient
+from lib import ProxyManager
 
 
 def save_real_ips(cfg: Configs, net_client: NetClient):
@@ -9,7 +10,7 @@ def save_real_ips(cfg: Configs, net_client: NetClient):
     cfg.send_server_ips = server_ips
 
 
-def proxy_start(cfg: Configs, net_client: NetClient):
+def proxy_start(cfg: Configs, net_client: NetClient, proxy_manager: ProxyManager):
     """
     启动本地代理
     :param net_client: 全局网络客户端
@@ -24,4 +25,11 @@ def proxy_start(cfg: Configs, net_client: NetClient):
         logging.info(f"[INFO] 得到域名挂载ip组: {cfg.send_server_ips}")
     except Exception as err:
         logging.warning(f"[WARN] 保存域名ip组失败: {err}")
+
+    if not proxy_manager.start():
+        return
+
+    input(f"结束阻塞:")
+
+
 

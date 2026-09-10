@@ -1,0 +1,26 @@
+{
+    "Version": "1.0",
+    "LocalhostViaProxy": False,
+    "IsTrafficLoggingEnabled": True,
+    "ProxyConfigs": [
+        {
+            "Id": 1,
+            "Type": "socks5",
+            "Host": "127.0.0.1",
+            "Port": "19080",
+            "Username": "Naruto_Proxy",
+            "Password": "",
+        }
+    ],
+    "ProxyRules": [
+        {
+            "ProcessName": "WebBrowserProcess.exe",
+            "TargetHosts": "*",
+            "TargetPorts": "10494",
+            "Protocol": "TCP",
+            "Action": "PROXY",
+            "IsEnabled": True,
+            "ProxyConfigId": 1,
+        }
+    ],
+}
