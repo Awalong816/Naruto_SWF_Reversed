@@ -143,7 +143,12 @@ class ProxyManager:
 
         return False
 
-    def start(self, cfg_path="./.pbprofile"):
+    def start(self, cfg_path=None):
+        if not cfg_path:
+            cfg_path = Path(__file__).with_name(
+                "proxy_cfg.pbprofile"
+            )
+
         if self.os_type == "windows":
             if not self.proxy_bridge_path:
                 logging.error("[ERROR] ProxyBridge 路径未设置，请先调用 check_proxy_bridge")
@@ -191,7 +196,7 @@ class ProxyManager:
 
             try:
                 # 发送 Ctrl+C 信号，让程序优雅退出并清理规则
-                self.proxy_handle.send_signal(signal.CTRL_C_EVENT)
+                self.proxy_handle.send_signal(signal.CTRL_BREAK_EVENT)
                 logging.info("[INFO] 已发送停止信号")
 
                 # 等待进程退出
@@ -202,7 +207,11 @@ class ProxyManager:
                 # 超时未退出，强制终止
                 logging.warning("[WARN] ProxyBridge 关闭超时，强制终止")
                 self.proxy_handle.terminate()
-                self.proxy_handle.wait(timeout=3)
+                try:
+                    self.proxy_handle.wait(timeout=3)
+                except sub.TimeoutExpired:
+                    self.proxy_handle.kill()
+                    self.proxy_handle.wait()
 
             except Exception as err:
                 logging.error(f"[ERROR] ProxyBridge 关闭失败: {err}")

@@ -102,7 +102,11 @@ if __name__ == "__main__":
     global_config.initialization_configs()
 
     global_net_client = get_net_client(global_config)
+
     proxy_manger = get_proxy_manager(global_config.os_type)
+    if not proxy_manger.check_proxy_bridge():
+        exit(1)
+
     # 鉴权
     if not is_admin(global_config.debug):
         logging.error(f"[ERROR] 鉴权失败, 使用管理员身份重新打开")
@@ -188,7 +192,7 @@ if __name__ == "__main__":
     # ======= 2.开始代理 ========
 
     try:
-        proxy_start(global_config, global_net_client)
+        proxy_start(global_config, global_net_client, proxy_manger)
     except Exception as err:
         logging.error(f"[ERROR] 启动本地代理失败: {err}")
         exit(1)
