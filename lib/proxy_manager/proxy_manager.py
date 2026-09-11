@@ -164,7 +164,7 @@ class ProxyManager:
                         changed = True
 
                     if self.proxy_port != proxy_port_in_file:
-                        cfg_json["ProxyConfigs"][0]["Port"] = self.proxy_port
+                        cfg_json["ProxyConfigs"][0]["Port"] = str(self.proxy_port)
                         changed = True
 
                     if changed:
