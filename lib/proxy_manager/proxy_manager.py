@@ -261,7 +261,7 @@ class ProxyManager:
 def get_proxy_manager(cfg: Configs):
     os_type = cfg.os_type or "windows"
     host = cfg.net_proxy_host or "127.0.0.1"
-    port = cfg.send_server_prot or 19080
+    port = int(cfg.net_proxy_prot) or 19080
 
     return ProxyManager(os_type, host, port)
 
