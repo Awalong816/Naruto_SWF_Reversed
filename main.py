@@ -103,7 +103,7 @@ if __name__ == "__main__":
 
     global_net_client = get_net_client(global_config)
 
-    proxy_manger = get_proxy_manager(global_config.os_type)
+    proxy_manger = get_proxy_manager(global_config)
     if not proxy_manger.check_proxy_bridge():
         exit(1)
 

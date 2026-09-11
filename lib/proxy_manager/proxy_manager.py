@@ -6,6 +6,8 @@ import shutil
 import logging
 from pathlib import Path
 
+from config import Configs
+
 logging.basicConfig(level=logging.INFO)
 
 class ProxyManager:
@@ -256,7 +258,11 @@ class ProxyManager:
                 self.proxy_handle = None
 
 
-def get_proxy_manager(os_type: str="windows", host: str="127.0.0.1", port: int=19080):
+def get_proxy_manager(cfg: Configs):
+    os_type = cfg.os_type or "windows"
+    host = cfg.net_proxy_host or "127.0.0.1"
+    port = cfg.send_server_prot or 19080
+
     return ProxyManager(os_type, host, port)
 
 
