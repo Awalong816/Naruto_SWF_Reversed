@@ -151,27 +151,18 @@ class ProxyManager:
             cfg_data = cfg_file.read_text(encoding="utf-8")
             cfg_json = json.loads(cfg_data)
             if len(cfg_json.get("ProxyConfigs", [])) > 0:
-                naruto_proxy_index = -1
-                for i in range(0, len(cfg_json["ProxyConfigs"])):
-                    cfg = cfg_json["ProxyConfigs"][i]
-                    if cfg.get("Username","") == "Naruto_Proxy":
-                        naruto_proxy_index = i
-                        break
-                if naruto_proxy_index < 0 :
-                    raise ValueError("没有找到游戏代理规则")
-
-                proxy_config = cfg_json["ProxyConfigs"][naruto_proxy_index]
+                proxy_config = cfg_json["ProxyConfigs"][0]
                 if proxy_config.get("Host", "") and proxy_config.get("Port", ""):
                     changed = False
                     proxy_host_in_file = proxy_config.get("Host", "")
                     proxy_port_in_file = int(proxy_config.get("Port", -1))
 
                     if self.proxy_host != proxy_host_in_file:
-                        cfg_json["ProxyConfigs"][naruto_proxy_index]["Host"] = self.proxy_host
+                        cfg_json["ProxyConfigs"][0]["Host"] = self.proxy_host
                         changed = True
 
                     if self.proxy_port != proxy_port_in_file:
-                        cfg_json["ProxyConfigs"][naruto_proxy_index]["Port"] = self.proxy_port
+                        cfg_json["ProxyConfigs"][0]["Port"] = self.proxy_port
                         changed = True
 
                     if changed:
