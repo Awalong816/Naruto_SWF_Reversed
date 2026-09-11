@@ -13,8 +13,8 @@ class Configs:
         # net_work
         self.net_max_connection = 50
         self.net_timeout = 60
-        self.net_proxy_host_path = ""
-        self.net_proxy_prot = 10494
+        self.net_proxy_host = "127.0.0.1"
+        self.net_proxy_prot = 19080
         # system
         self.os_type = ""
         self.debug = False
@@ -49,8 +49,8 @@ class Configs:
             self.net_timeout = int(net_work_cfg.get("timeout", 60))
             # # proxy
             net_proxy_cfg = net_work_cfg.get("proxy", {})
-            self.net_proxy_host_path = net_proxy_cfg.get("host_path", "")
-            self.net_proxy_prot = net_proxy_cfg.get("proxy_prot", 10494)
+            self.net_proxy_host = net_proxy_cfg.get("proxy_host", "127.0.0.1")
+            self.net_proxy_prot = net_proxy_cfg.get("proxy_prot", 19080)
 
             # system
             system_cfg = config_dict.get("system", {})

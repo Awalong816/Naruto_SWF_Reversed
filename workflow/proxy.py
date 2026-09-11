@@ -26,10 +26,8 @@ def proxy_start(cfg: Configs, net_client: NetClient, proxy_manager: ProxyManager
     except Exception as err:
         logging.warning(f"[WARN] 保存域名ip组失败: {err}")
 
-    if not proxy_manager.start():
-        return
+    # 先启动 socks5 服务
 
-    input(f"结束阻塞:")
 
 
 

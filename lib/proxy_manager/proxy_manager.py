@@ -1,3 +1,4 @@
+import json
 import signal
 import subprocess as sub # 指令运行
 import os
@@ -8,9 +9,11 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 
 class ProxyManager:
-    def __init__(self, os_type: str):
+    def __init__(self, os_type: str, host: str, port: int):
         self.os_type = os_type
         self.proxy_bridge_path = ""
+        self.proxy_host = host
+        self.proxy_port = port
         self.proxy_handle = None
 
     def check_proxy_bridge(self) -> bool:
@@ -143,7 +146,47 @@ class ProxyManager:
 
         return False
 
-    def start(self, cfg_path=None):
+    def _proof(self, cfg_file: Path):
+        try:
+            cfg_data = cfg_file.read_text(encoding="utf-8")
+            cfg_json = json.loads(cfg_data)
+            if len(cfg_json.get("ProxyConfigs", [])) > 0:
+                naruto_proxy_index = -1
+                for i in range(0, len(cfg_json["ProxyConfigs"])):
+                    cfg = cfg_json["ProxyConfigs"][i]
+                    if cfg.get("Username","") == "Naruto_Proxy":
+                        naruto_proxy_index = i
+                        break
+                if naruto_proxy_index < 0 :
+                    raise ValueError("没有找到游戏代理规则")
+
+                proxy_config = cfg_json["ProxyConfigs"][naruto_proxy_index]
+                if proxy_config.get("Host", "") and proxy_config.get("Port", ""):
+                    changed = False
+                    proxy_host_in_file = proxy_config.get("Host", "")
+                    proxy_port_in_file = int(proxy_config.get("Port", -1))
+
+                    if self.proxy_host != proxy_host_in_file:
+                        cfg_json["ProxyConfigs"][naruto_proxy_index]["Host"] = self.proxy_host
+                        changed = True
+
+                    if self.proxy_port != proxy_port_in_file:
+                        cfg_json["ProxyConfigs"][naruto_proxy_index]["Port"] = self.proxy_port
+                        changed = True
+
+                    if changed:
+                        try:
+                            cfg_file.write_text(json.dumps(cfg_json))
+                        except Exception as err:
+                            raise Exception(f"更新proxy-bridge配置文件失败: {err}")
+
+                logging.info(f"[INFO] 代理服务地址: {proxy_config.get('Host',self.proxy_host)}")
+                logging.info(f"[INFO] 代理服务端口: {proxy_config.get('Port',self.proxy_port)}")
+
+        except Exception as err:
+            logging.warning(f"[WARN] 检察更新配置失败, 将继续使用默认配置, 有可能导致yaml配置参数失效: {err}")
+
+    def start(self, cfg_path=None): # 需要先启动socket5服务
         if not cfg_path:
             cfg_path = Path(__file__).with_name(
                 "proxy_cfg.pbprofile"
@@ -157,6 +200,9 @@ class ProxyManager:
             if not cfg_file.is_file():
                 logging.error(f"[ERROR] ProxyBridge 配置文件不存在: {cfg_path}")
                 return False
+
+            # 检察更新配置
+            self._proof(cfg_file)
 
             try:
                 # 启动 ProxyBridge CLI，加载配置文件
@@ -219,8 +265,8 @@ class ProxyManager:
                 self.proxy_handle = None
 
 
-def get_proxy_manager(os_type: str="windows"):
-    return ProxyManager(os_type)
+def get_proxy_manager(os_type: str="windows", host: str="127.0.0.1", port: int=19080):
+    return ProxyManager(os_type, host, port)
 
 
 if __name__ == "__main__":

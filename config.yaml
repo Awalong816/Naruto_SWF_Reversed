@@ -13,8 +13,8 @@ net_work:
   max_connection: 50
   timeout: 60
   proxy:
-    host_path: 'C:\Windows\System32\drivers\etc\hosts'
-    proxy_prot:
+    proxy_host: "127.0.0.1"
+    proxy_prot: 19080
 
 system:
   os: "windows"
