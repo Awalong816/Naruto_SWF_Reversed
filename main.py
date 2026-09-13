@@ -4,8 +4,7 @@ import ctypes
 
 from config import Configs
 from workflow import get_qqgamebox_client_path, analyze_from_server, analyze_tbs_cache_front, proxy_start
-from net import get_net_client
-from lib import get_proxy_manager
+from net import get_net_client, get_proxy_manager
 
 logging.basicConfig(level=logging.INFO) # 最低播报等级
 

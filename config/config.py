@@ -15,11 +15,13 @@ class Configs:
         self.net_timeout = 60
         self.net_proxy_host = "127.0.0.1"
         self.net_proxy_prot = 19080
+        self.net_proxy_max_input_queue = 100
         # system
         self.os_type = ""
         self.debug = False
         # profile
         self.zone_id = ""
+
         # running_config
         self.send_server_domain = ""
         self.send_server_ips = [] # 域名可能挂载多个ip
@@ -51,6 +53,7 @@ class Configs:
             net_proxy_cfg = net_work_cfg.get("proxy", {})
             self.net_proxy_host = net_proxy_cfg.get("proxy_host", "127.0.0.1")
             self.net_proxy_prot = net_proxy_cfg.get("proxy_prot", 19080)
+            self.net_proxy_max_input_queue = net_proxy_cfg.get("max_input_queue", 100)
 
             # system
             system_cfg = config_dict.get("system", {})

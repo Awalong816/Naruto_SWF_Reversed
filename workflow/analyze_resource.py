@@ -444,19 +444,19 @@ if __name__ == "__main__":
     # print("实际查找位置:", resource_cfg_path.resolve())
     from net import get_net_client
 
-    cfg = Configs()
-    cfg.initialization_configs(r"../config.yaml")
-    gen = analyze_tbs_cache_after(cfg)
+    cfgs = Configs()
+    cfgs.initialization_configs(r"../config.yaml")
+    gen = analyze_tbs_cache_after(cfgs)
 
     try:
         resource_requirement = next(gen)
     except Exception as err:
         print(f"[ERROR] 后处理 part1 意外错误: {err}")
 
-    net_client = get_net_client(cfg)
+    net_client = get_net_client(cfgs)
 
     try:
-        net_client.download_requirement(resource_requirement, cfg.resource_save_path)
+        net_client.download_requirement(resource_requirement, cfgs.resource_save_path)
     except Exception as err:
         print(f"[ERROR]下载失败: {err}")
 

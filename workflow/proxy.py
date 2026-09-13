@@ -1,8 +1,7 @@
 import logging
 
 from config import Configs
-from net.net_client import NetClient
-from lib import ProxyManager
+from net import NetClient, ProxyManager
 
 
 def save_real_ips(cfg: Configs, net_client: NetClient):

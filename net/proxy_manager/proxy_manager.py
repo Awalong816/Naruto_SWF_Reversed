@@ -27,7 +27,7 @@ class ProxyManager:
                     ['winget', 'list', '--id', 'InterceptSuite.ProxyBridge', '--exact'],
                     capture_output=True,
                     text=True,
-                    timeout=10,
+                    timeout=300,
                     encoding='utf-8',
                     errors='ignore'
                 )
@@ -85,6 +85,7 @@ class ProxyManager:
                     return False
             except Exception as err:
                 logging.error(f"[ERROR] proxy-bridge 检查失败: {err}")
+                return False
             # 检查可用性
             core_path = cli_path.parent / "ProxyBridgeCore.dll"
 
@@ -120,9 +121,9 @@ class ProxyManager:
             version = result.stdout.strip() or "版本未知"
 
             logging.info(
-                f"[INFO] ProxyBridge依赖正常\n"
+                f"\n[INFO] ProxyBridge依赖正常\n"
                 f"路径: {cli_path}\n"
-                f"版本: {version}"
+                f"版本: \n{version}\n"
             )
 
             return True
@@ -230,21 +231,21 @@ class ProxyManager:
     def close(self):
         if self.os_type == "windows":
             if not self.proxy_handle:
-                logging.warning("[WARN] 没有正在运行的 ProxyBridge 进程")
+                logging.warning("[WARN] 关闭反馈: 没有正在运行的 ProxyBridge 进程")
                 return
 
             try:
                 # 发送 Ctrl+C 信号，让程序优雅退出并清理规则
                 self.proxy_handle.send_signal(signal.CTRL_BREAK_EVENT)
-                logging.info("[INFO] 已发送停止信号")
+                logging.info("[INFO] 关闭反馈: 已发送停止信号")
 
                 # 等待进程退出
                 self.proxy_handle.wait(timeout=5)
-                logging.info("[INFO] ProxyBridge 已关闭")
+                logging.info("[INFO] 关闭反馈: ProxyBridge 已关闭")
 
             except sub.TimeoutExpired:
                 # 超时未退出，强制终止
-                logging.warning("[WARN] ProxyBridge 关闭超时，强制终止")
+                logging.warning("[WARN] 关闭反馈: ProxyBridge 关闭超时，强制终止")
                 self.proxy_handle.terminate()
                 try:
                     self.proxy_handle.wait(timeout=3)
@@ -253,7 +254,7 @@ class ProxyManager:
                     self.proxy_handle.wait()
 
             except Exception as err:
-                logging.error(f"[ERROR] ProxyBridge 关闭失败: {err}")
+                logging.error(f"[ERROR] 关闭反馈: ProxyBridge 关闭失败: {err}")
             finally:
                 self.proxy_handle = None
 
