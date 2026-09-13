@@ -120,8 +120,13 @@ class Socks5Manager:
                 pipe_client.sendall(b'\x05\xff') # 拒绝握手
                 raise PermissionError(f"没有无认证方法")
 
+            # 选择认证方式
+            pipe_client.sendall(b'\x05\x00') # 选择除了无验证的其他方式需要等待客户端再发送内容，如用户名和密码 选择0则直接握手成功
         except Exception as err:
-            pass
+            logging.warning(f"[WARN] tcp socket 通道-握手失败: {err}")
+            return
+
+        # 2.
 
     def _recv_bytes(self, pipe: socket.socket, length: int):
         result = bytearray() # 可以序列化解包
