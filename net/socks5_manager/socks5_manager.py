@@ -1,5 +1,6 @@
 import logging
 import queue
+import struct
 import socket
 import threading as th
 
@@ -11,11 +12,34 @@ class Socks5Manager:
             host: str,
             port: int,
             max_input: int,
+            t_host_domain: str="" | list[str],
+            t_host_ipv4: str="" | list[str],
+            t_host_ipv6: str="" | list[str],
             ):
         # 基础
         self.server_host = host
         self.server_port = port
         self.stop = True # 循环开关
+
+        # 前序分析可能ip，作为白名单
+        if type(t_host_domain) is str:
+            self.host_domain_white_list = [t_host_domain]
+        else:
+            self.host_domain_white_list = t_host_domain
+
+        if type(t_host_ipv4) is str:
+            self.host_ipv4_white_list = [t_host_ipv4]
+        else:
+            self.host_ipv4_white_list = t_host_ipv4
+
+        if type(t_host_ipv6) is str:
+            self.host_ipv6_white_list = [t_host_ipv6]
+        else:
+            self.host_ipv6_white_list = t_host_ipv6
+
+        self.target_ipv4 = ""
+        self.target_domain = ""
+        self.target_port = 0
 
         # 句柄
         self.socket_handle = None # socket句柄
@@ -102,6 +126,7 @@ class Socks5Manager:
             ):
         """
         二级线程 处理tcp交互事件
+        * 每一环节都有独立的头 第一位都是协议版本
         1. socks5 握手
         2. 连接目标
         3. 双向转发
@@ -126,7 +151,63 @@ class Socks5Manager:
             logging.warning(f"[WARN] tcp socket 通道-握手失败: {err}")
             return
 
-        # 2.
+        # 2.获取目标信息
+        try:
+            n = 4
+            protocol, command, signature, ip_type = self._recv_bytes(pipe_client, n)
+            if protocol != 0x05:
+                raise Exception(f"不是socks5协议")
+            if command != 0x01:
+                """
+                01: CONNECT 建立tcp链接
+                02: BIND 绑定监听端口
+                03: UDP ASSOCIATE 建立udp转发通道
+                """
+                raise Exception(f"不支持的命令: {command}")
+            if signature != 0x00:
+                raise Exception(f"预留位异常")
+            # target host
+            """
+            * ip_type
+            01: ipv4 地址
+            03: 域名
+            04: ipv6 地址
+            """
+            if ip_type == b'\x01': # ipv4
+                data = self._recv_bytes(pipe_client, 4)
+                ipv4 = socket.inet_ntop(socket.AF_INET, data) # bytes -> str
+                if len(self.host_ipv4_white_list) > 0:
+                    if ipv4 in self.host_ipv4_white_list:
+                        self.target_ipv4 = ipv4
+                else:
+                    self.target_ipv4 = ipv4
+            elif ip_type == b'\x03': # domain
+                length = self._recv_bytes(pipe_client, 1)[0] # **bytes索引是数值，切片还是bytes**
+                if length <= 0:
+                    raise Exception(f"目标域名长度解析错误")
+                data = self._recv_bytes(pipe_client, length)
+                domain = data.decode("idna")
+                if len(self.host_domain_white_list) > 0:
+                    if domain in self.host_domain_white_list:
+                        self.target_domain = domain
+                else:
+                    self.target_domain = domain
+            elif ip_type == b'\x04': # ipv6
+                data = self._recv_bytes(pipe_client, 16)
+                ipv6 =  socket.inet_ntop(socket.AF_INET6, data)
+                if len(self.host_ipv6_white_list) > 0:
+                    if ipv6 in self.host_ipv6_white_list:
+                        self.target_ipv6 = ipv6
+                else:
+                    self.target_ipv6 = ipv6
+            else:
+                raise Exception(f"不支持的host请求")
+            # target port SOCKS5规定大端在前 高位在前
+            self.target_port = struct.unpack("!H", self._recv_bytes(pipe_client, 2))[0]
+
+        except Exception as err:
+            logging.warning(f"[WARN] tcp socket 通道-获取目标失败: {err}")
+            return
 
     def _recv_bytes(self, pipe: socket.socket, length: int):
         result = bytearray() # 可以序列化解包
@@ -142,7 +223,7 @@ def get_socks_manager(cfg: Configs):
     host = cfg.net_proxy_host or "127.0.0.1"
     port = int(cfg.net_proxy_prot or 19080)
 
-    return Socks5Manager(host, port)
+    return Socks5Manager(host, port, )
 
 
 if __name__ == "__main__":
