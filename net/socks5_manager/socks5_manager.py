@@ -1,5 +1,6 @@
 import logging
 import queue
+import select
 import struct
 import socket
 import threading as th
@@ -12,9 +13,9 @@ class Socks5Manager:
             host: str,
             port: int,
             max_input: int,
-            t_host_domain: str="" | list[str],
-            t_host_ipv4: str="" | list[str],
-            t_host_ipv6: str="" | list[str],
+            t_host_domain: str | list[str] = "",
+            t_host_ipv4: str | list[str] = "",
+            t_host_ipv6: str | list[str] = "",
             ):
         # 基础
         self.server_host = host
@@ -77,7 +78,7 @@ class Socks5Manager:
         )
         server.bind((self.server_host, self.server_port))  # socket绑定
         # 循环accept()会阻塞等待到读取tcp
-        server.listen(self.max_input_queue)  # 设置最长等待队列，后面请求的会被拒绝
+        server.listen(self.max_input_queue)  # 设置最长等待队列，后面请求的会被拒绝 性质：建立好的通道数，在连接之后负责通信，本体基本不变化，所以上限值不大
         server.settimeout(1)  # 防止循环卡死 读取不到tcp也可以回到循环开头判断服务是不是还在进行，否则无法关闭循环
         # ========= 配置完成，放入线程运行 =========
         self.socket_handle = server
@@ -254,13 +255,22 @@ class Socks5Manager:
         sockets = [src_pipe, tag_pipe]
 
         while not self.is_stop():
-            pass
+            # 有可读的内容socket立即返回， 有可写的socket立即返回， 有错误的socket立即返回
+            # **有readable就是发生了事件，需要处理(触发); writeable只是判断这个socket是否已满还能不能写入数据(常驻)**
+            readable, writeable, wrongs = select.select(
+                sockets, # 对应可读监控列表
+                [], # 对应可写监控列表，基本都不为空，忽略
+                sockets, # 对应错误的监控列表
+                1, # 等不到抉择时间
+            )
+
 
 def get_socks_manager(cfg: Configs):
     host = cfg.net_proxy_host or "127.0.0.1"
     port = int(cfg.net_proxy_prot or 19080)
+    max_input_events = int(cfgs.net_proxy_max_input_queue)
 
-    return Socks5Manager(host, port, )
+    return Socks5Manager(host, port, max_input_events)
 
 
 if __name__ == "__main__":
