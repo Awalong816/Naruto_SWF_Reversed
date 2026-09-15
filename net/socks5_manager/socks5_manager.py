@@ -246,7 +246,7 @@ class Socks5Manager:
             result.extend(data)
         return result
 
-    def _communication(
+    def _communication( # 一条连接链
             self,
             src_pipe: socket.socket,
             tag_pipe: socket.socket,
@@ -263,6 +263,9 @@ class Socks5Manager:
                 sockets, # 对应错误的监控列表
                 1, # 等不到抉择时间
             )
+            # 有任何断裂就结束
+            if wrongs:
+                return
 
 
 def get_socks_manager(cfg: Configs):
