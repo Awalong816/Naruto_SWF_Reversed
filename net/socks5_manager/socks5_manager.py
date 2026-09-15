@@ -229,6 +229,13 @@ class Socks5Manager:
             logging.warning(f"[WARN] tcp socket 通道-连接目标服务器失败: {err}")
             return
 
+        # 4.双向转发
+        self._communication(
+            src_pipe=pipe_client,
+            tag_pipe=target_pipe_client,
+            context=context,
+        )
+
     def _recv_bytes(self, pipe: socket.socket, length: int):
         result = bytearray() # 可以序列化解包
         while len(result) < length:
@@ -238,6 +245,16 @@ class Socks5Manager:
             result.extend(data)
         return result
 
+    def _communication(
+            self,
+            src_pipe: socket.socket,
+            tag_pipe: socket.socket,
+            context: dict=None,
+        ):
+        sockets = [src_pipe, tag_pipe]
+
+        while not self.is_stop():
+            pass
 
 def get_socks_manager(cfg: Configs):
     host = cfg.net_proxy_host or "127.0.0.1"
@@ -248,6 +265,6 @@ def get_socks_manager(cfg: Configs):
 
 if __name__ == "__main__":
     cfgs = Configs()
-    cfgs.initialization_configs(r"../config.yaml")
+    cfgs.initialization_configs(r"E:\pythonProject\启动器\config.yaml")
 
-    socks5_manager = get_socks_manager()
+    socks5_manager = get_socks_manager(cfgs)
