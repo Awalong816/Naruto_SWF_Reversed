@@ -37,10 +37,6 @@ class Socks5Manager:
         else:
             self.host_ipv6_white_list = t_host_ipv6
 
-        self.target_ipv4 = ""
-        self.target_domain = ""
-        self.target_port = 0
-
         # 句柄
         self.socket_handle = None # socket句柄
         self.socket_thread_handle = None # 运行socket循环的线程的句柄
@@ -173,14 +169,15 @@ class Socks5Manager:
             03: 域名
             04: ipv6 地址
             """
+            target_host = ""
             if ip_type == b'\x01': # ipv4
                 data = self._recv_bytes(pipe_client, 4)
-                ipv4 = socket.inet_ntop(socket.AF_INET, data) # bytes -> str
+                ipv4 = socket.inet_ntop(socket.AF_INET, data) # bytes -> str 默认的大端
                 if len(self.host_ipv4_white_list) > 0:
                     if ipv4 in self.host_ipv4_white_list:
-                        self.target_ipv4 = ipv4
+                        target_host = ipv4
                 else:
-                    self.target_ipv4 = ipv4
+                    target_host = ipv4
             elif ip_type == b'\x03': # domain
                 length = self._recv_bytes(pipe_client, 1)[0] # **bytes索引是数值，切片还是bytes**
                 if length <= 0:
@@ -189,24 +186,47 @@ class Socks5Manager:
                 domain = data.decode("idna")
                 if len(self.host_domain_white_list) > 0:
                     if domain in self.host_domain_white_list:
-                        self.target_domain = domain
+                        target_host = domain
                 else:
-                    self.target_domain = domain
+                    target_host = domain
             elif ip_type == b'\x04': # ipv6
                 data = self._recv_bytes(pipe_client, 16)
-                ipv6 =  socket.inet_ntop(socket.AF_INET6, data)
+                ipv6 = socket.inet_ntop(socket.AF_INET6, data)
                 if len(self.host_ipv6_white_list) > 0:
                     if ipv6 in self.host_ipv6_white_list:
-                        self.target_ipv6 = ipv6
+                        target_host = ipv6
                 else:
-                    self.target_ipv6 = ipv6
+                    target_host = ipv6
             else:
                 raise Exception(f"不支持的host请求")
             # target port SOCKS5规定大端在前 高位在前
-            self.target_port = struct.unpack("!H", self._recv_bytes(pipe_client, 2))[0]
-
+            target_port = struct.unpack("!H", self._recv_bytes(pipe_client, 2))[0]
+            # 组成连接的上下文
+            context = {
+                "src_host": pipe_info[0],
+                "src_port": pipe_info[1],
+                "tag_host": target_host,
+                "tag_port": target_port,
+            }
         except Exception as err:
             logging.warning(f"[WARN] tcp socket 通道-获取目标失败: {err}")
+            return
+
+        # 3.连接目标服务器
+        try:
+            target_pipe_client = socket.create_connection(
+                (target_host, target_port),
+                timeout=30,
+            )
+            target_pipe_client.settimeout(None)
+            self.pipe_clients.add(target_pipe_client)
+            pipe_client.sendall(
+                b"\x05\x00\x00\x01"  # socks5版本，状态，标志位，host类型
+                b"\x00\x00\x00\x00"  # 绑定地址 不关心凑最小长度用
+                b"\x00\x00"  # 绑定端口 凑最小长度用
+            )
+        except Exception as err:
+            logging.warning(f"[WARN] tcp socket 通道-连接目标服务器失败: {err}")
             return
 
     def _recv_bytes(self, pipe: socket.socket, length: int):
