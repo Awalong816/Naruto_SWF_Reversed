@@ -426,11 +426,32 @@ def get_socks_manager(cfg: Configs):
 
 if __name__ == "__main__":
     cfgs = Configs()
-    cfgs.initialization_configs(r"E:\pythonProject\启动器\config.yaml")
-    cfgs.send_server_ips = ["101.226.142.64"]
+    cfgs.initialization_configs(
+        r"E:\pythonProject\启动器\config.yaml"
+    )
+
+    cfgs.send_server_domain = (
+        "zone.huoying.qq.com"
+    )
+
+    # 启动时动态获取真实IP，避免硬编码过期
+    cfgs.send_server_ips = list(
+        socket.gethostbyname_ex(
+            cfgs.send_server_domain
+        )[2]
+    )
+
+    logging.info(
+        f"[TEST] 游戏服务器IP: "
+        f"{cfgs.send_server_ips}"
+    )
 
     socks5_manager = get_socks_manager(cfgs)
-    socks5_manager.start()
-    input(f"socks5 任意输入结束:")
-    socks5_manager.close()
+
+    try:
+        socks5_manager.start()
+        input("SOCKS5运行中，输入任意内容结束:")
+
+    finally:
+        socks5_manager.close()
 

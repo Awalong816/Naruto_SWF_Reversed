@@ -270,11 +270,27 @@ def get_proxy_manager(cfg: Configs):
 
 if __name__ == "__main__":
     cfgs = config.Configs()
-    cfgs.initialization_configs("E:\pythonProject\启动器\config.yaml")
+    cfgs.initialization_configs(
+        r"E:\pythonProject\启动器\config.yaml"
+    )
 
     proxy_manager = get_proxy_manager(cfgs)
-    proxy_manager.check_proxy_bridge()
 
-    proxy_manager.start()
-    input(f"proxy 输入任意结束:")
-    proxy_manager.close()
+    try:
+        if not proxy_manager.check_proxy_bridge():
+            raise RuntimeError(
+                "ProxyBridge依赖检查失败"
+            )
+
+        if not proxy_manager.start():
+            raise RuntimeError(
+                "ProxyBridge启动失败"
+            )
+
+        input(
+            "ProxyBridge运行中，"
+            "输入任意内容结束:"
+        )
+
+    finally:
+        proxy_manager.close()
