@@ -191,6 +191,9 @@ if __name__ == "__main__":
         logging.error(f"[ERROR] 启动本地代理失败: {err}")
         exit(1)
 
+    # 阻塞
+    input(f"无UI阻塞,输入任意退出:")
+
     # ======= 退出清理 ========
     logging.info(f"[INFO] 退出清理: net_client...")
     global_net_client.close()
