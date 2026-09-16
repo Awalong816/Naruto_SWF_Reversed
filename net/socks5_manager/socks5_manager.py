@@ -16,8 +16,6 @@ class Socks5Manager:
             port: int,
             max_input: int,
             t_host_domain: str | list[str] = None,
-            t_host_ipv4: str | list[str] = None,
-            t_host_ipv6: str | list[str] = None,
             ):
         # 基础
         self.server_host = host
@@ -27,24 +25,10 @@ class Socks5Manager:
         # 前序分析可能ip，作为白名单
         if type(t_host_domain) is str:
             self.host_domain_white_list = [t_host_domain]
-        elif t_host_domain is None:
+        elif not t_host_domain:
             self.host_domain_white_list = []
         else:
             self.host_domain_white_list = t_host_domain
-
-        if type(t_host_ipv4) is str:
-            self.host_ipv4_white_list = [t_host_ipv4]
-        elif t_host_ipv4 is None:
-            self.host_ipv4_white_list = []
-        else:
-            self.host_ipv4_white_list = t_host_ipv4
-
-        if type(t_host_ipv6) is str:
-            self.host_ipv6_white_list = [t_host_ipv6]
-        elif t_host_ipv6 is None:
-            self.host_ipv6_white_list = []
-        else:
-            self.host_ipv6_white_list = t_host_ipv6
 
         # 句柄
         self.socket_handle = None # socket句柄
@@ -195,11 +179,7 @@ class Socks5Manager:
                 if ip_type == 1:  # ipv4
                     data = self._recv_bytes(pipe_client, 4)
                     ipv4 = socket.inet_ntop(socket.AF_INET, data)  # bytes -> str 默认的大端
-                    if len(self.host_ipv4_white_list) > 0:
-                        if ipv4 in self.host_ipv4_white_list:
-                            target_host = ipv4
-                    else:
-                        target_host = ipv4
+                    target_host = ipv4
                 elif ip_type == 3:  # domain
                     length = self._recv_bytes(pipe_client, 1)[0]  # **bytes索引是数值，切片还是bytes**
                     if length <= 0:
@@ -214,11 +194,7 @@ class Socks5Manager:
                 elif ip_type == 4:  # ipv6
                     data = self._recv_bytes(pipe_client, 16)
                     ipv6 = socket.inet_ntop(socket.AF_INET6, data)
-                    if len(self.host_ipv6_white_list) > 0:
-                        if ipv6 in self.host_ipv6_white_list:
-                            target_host = ipv6
-                    else:
-                        target_host = ipv6
+                    target_host = ipv6
                 else:
                     raise Exception(f"不支持的host请求")
                 # target port SOCKS5规定大端在前 高位在前
@@ -420,7 +396,6 @@ def get_socks_manager(cfg: Configs):
         port=port,
         max_input=max_input_events,
         t_host_domain=cfg.send_server_domain,
-        t_host_ipv4=cfg.send_server_ips
     )
 
 
@@ -428,22 +403,6 @@ if __name__ == "__main__":
     cfgs = Configs()
     cfgs.initialization_configs(
         r"E:\pythonProject\启动器\config.yaml"
-    )
-
-    cfgs.send_server_domain = (
-        "zone.huoying.qq.com"
-    )
-
-    # 启动时动态获取真实IP，避免硬编码过期
-    cfgs.send_server_ips = list(
-        socket.gethostbyname_ex(
-            cfgs.send_server_domain
-        )[2]
-    )
-
-    logging.info(
-        f"[TEST] 游戏服务器IP: "
-        f"{cfgs.send_server_ips}"
     )
 
     socks5_manager = get_socks_manager(cfgs)

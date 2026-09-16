@@ -4,12 +4,7 @@ from config import Configs
 from net import NetClient, ProxyManager
 
 
-def save_real_ips(cfg: Configs, net_client: NetClient):
-    server_ips = net_client.dns_manager.domain2ip(cfg.send_server_domain)
-    cfg.send_server_ips = server_ips
-
-
-def proxy_start(cfg: Configs, net_client: NetClient, proxy_manager: ProxyManager):
+def proxy_start(cfg: Configs, net_client: NetClient):
     """
     启动本地代理
     :param net_client: 全局网络客户端
@@ -18,14 +13,19 @@ def proxy_start(cfg: Configs, net_client: NetClient, proxy_manager: ProxyManager
     """
     debug = cfg.debug
 
-    # 兜底
-    try:
-        save_real_ips(cfg, net_client)
-        logging.info(f"[INFO] 得到域名挂载ip组: {cfg.send_server_ips}")
-    except Exception as err:
-        logging.warning(f"[WARN] 保存域名ip组失败: {err}")
+    net_client.rig_socks5_manager(cfg)
+    net_client.rig_proxy_manager(cfg)
+
+    # 代理服务状态检察
+    if not net_client.proxy_manager.check_proxy_bridge():
+        exit(1)
 
     # 先启动 socks5 服务
+    net_client.socks5_manager.start()
+    # 后启动 proxy 代理规则
+    net_client.proxy_manager.start()
+
+
 
 
 

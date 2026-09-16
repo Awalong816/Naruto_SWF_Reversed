@@ -16,6 +16,15 @@
     {
       "ProcessName": "WebBrowserProcess.exe",
       "TargetHosts": "*",
+      "TargetPorts": "80;443;8001;843",
+      "Protocol": "TCP",
+      "Action": "DIRECT",
+      "IsEnabled": true,
+      "ProxyConfigId": 0
+    },
+    {
+      "ProcessName": "WebBrowserProcess.exe",
+      "TargetHosts": "*",
       "TargetPorts": "10494",
       "Protocol": "TCP",
       "Action": "PROXY",

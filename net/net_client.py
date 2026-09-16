@@ -3,13 +3,16 @@ import os
 import httpx
 import logging
 from pathlib import Path
+from typing import Optional
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from config import Configs
-from net.dns_util.dns_manager import get_dns_manager
+from .dns_util.dns_manager import get_dns_manager, DNSManager
+from .socks5_manager.socks5_manager import get_socks_manager, Socks5Manager
+from .proxy_manager.proxy_manager import get_proxy_manager, ProxyManager
 
 logging.basicConfig(level=logging.INFO) # 最低播报等级
 
@@ -26,6 +29,8 @@ class NetClient:
             follow_redirects=True, # 允许重定向
         )
         self.dns_manager = get_dns_manager() # dns模块
+        self.socks5_manager: Optional[Socks5Manager] = None
+        self.proxy_manager: Optional[ProxyManager] = None
 
     def get(self, url: str, **kwargs):
         response = self.client.get(url, **kwargs)
@@ -35,7 +40,6 @@ class NetClient:
         else:
             if not response.is_redirect:
                 raise Exception(f"请求资源 <{url}> 失败\n状态码: {response.status_code}\n说明: {response.text}")
-
 
     def download_requirement(self, requirement: dict, save_path: str):
         save_dir = Path(save_path)
@@ -57,6 +61,18 @@ class NetClient:
                 logging.warning(f"[WARN] {err}")
                 continue
 
+    def rig_socks5_manager(self, cfg: Configs):
+        self.socks5_manager = get_socks_manager(cfg)
+
+    def rig_proxy_manager(self, cfg: Configs):
+        self.proxy_manager = get_proxy_manager(cfg)
+
+    def close(self):
+        if self.socks5_manager:
+            self.socks5_manager.close()
+
+        if self.proxy_manager:
+            self.proxy_manager.close()
 
 def get_net_client(cfg: Configs):
     return NetClient(cfg.net_max_connection, cfg.net_timeout)

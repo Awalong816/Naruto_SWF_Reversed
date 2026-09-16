@@ -58,10 +58,8 @@ class ProxyManager:
                         else:
                             logging.error(f"[ERROR] proxy-bridge 安装失败: {result.stderr}")
                             return False
-                    elif install_ans.lower() == "n":
-                        return False
                     else:
-                        raise ValueError("输入非法")
+                        return False
                 elif result.returncode == 0 and result.stdout:
                     logging.info("[INFO] proxy-bridge 已安装")
 
@@ -151,35 +149,31 @@ class ProxyManager:
         return False
 
     def _proof(self, cfg_file: Path):
-        try:
-            cfg_data = cfg_file.read_text(encoding="utf-8")
-            cfg_json = json.loads(cfg_data)
-            if len(cfg_json.get("ProxyConfigs", [])) > 0:
-                proxy_config = cfg_json["ProxyConfigs"][0]
-                if proxy_config.get("Host", "") and proxy_config.get("Port", ""):
-                    changed = False
-                    proxy_host_in_file = proxy_config.get("Host", "")
-                    proxy_port_in_file = int(proxy_config.get("Port", -1))
+        """
+        根据项目运行配置检察并更新 proxy-bridge 的启动配置
+        """
+        cfg_data = cfg_file.read_text(encoding="utf-8")
+        cfg_json = json.loads(cfg_data)
+        if len(cfg_json.get("ProxyConfigs", [])) > 0:
+            proxy_config = cfg_json["ProxyConfigs"][0]
+            if proxy_config.get("Host", "") and proxy_config.get("Port", ""):
+                changed = False
+                proxy_host_in_file = proxy_config.get("Host", "")
+                proxy_port_in_file = int(proxy_config.get("Port", -1))
 
-                    if self.proxy_host != proxy_host_in_file:
-                        cfg_json["ProxyConfigs"][0]["Host"] = self.proxy_host
-                        changed = True
+                if self.proxy_host != proxy_host_in_file:
+                    cfg_json["ProxyConfigs"][0]["Host"] = self.proxy_host
+                    changed = True
 
-                    if self.proxy_port != proxy_port_in_file:
-                        cfg_json["ProxyConfigs"][0]["Port"] = str(self.proxy_port)
-                        changed = True
+                if self.proxy_port != proxy_port_in_file:
+                    cfg_json["ProxyConfigs"][0]["Port"] = str(self.proxy_port)
+                    changed = True
 
-                    if changed:
-                        try:
-                            cfg_file.write_text(json.dumps(cfg_json))
-                        except Exception as err:
-                            raise Exception(f"更新proxy-bridge配置文件失败: {err}")
+                if changed:
+                    cfg_file.write_text(json.dumps(cfg_json))
 
-                logging.info(f"[INFO] 代理服务地址: {proxy_config.get('Host',self.proxy_host)}")
-                logging.info(f"[INFO] 代理服务端口: {proxy_config.get('Port',self.proxy_port)}")
-
-        except Exception as err:
-            logging.warning(f"[WARN] 检察更新配置失败, 将继续使用默认配置, 有可能导致yaml配置参数失效: {err}")
+            logging.info(f"[INFO] 代理服务地址: {proxy_config.get('Host',self.proxy_host)}")
+            logging.info(f"[INFO] 代理服务端口: {proxy_config.get('Port',self.proxy_port)}")
 
     def start(self, cfg_path=None): # 需要先启动socket5服务
         if not cfg_path:
@@ -197,7 +191,10 @@ class ProxyManager:
                 return False
 
             # 检察更新配置
-            self._proof(cfg_file)
+            try:
+                self._proof(cfg_file)
+            except Exception as err:
+                logging.warning(f"[WARN] 检察更新配置失败, 将继续使用默认配置, 有可能导致yaml配置参数失效: {err}")
 
             try:
                 # 启动 ProxyBridge CLI，加载配置文件
@@ -213,8 +210,8 @@ class ProxyManager:
                 # 使用 Popen 后台启动，不阻塞当前进程
                 self.proxy_handle = sub.Popen(
                     cmd,
-                    # stdout=sub.DEVNULL,
-                    # stderr=sub.DEVNULL, # 防止err通道单独塞满
+                    stdout=sub.DEVNULL,
+                    stderr=sub.DEVNULL, # 防止err通道单独塞满
                     text=True,
                     encoding='utf-8',
                     errors='ignore',

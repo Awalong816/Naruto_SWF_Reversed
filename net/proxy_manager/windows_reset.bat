@@ -14,13 +14,11 @@ tasklist /FI "IMAGENAME eq %PROCESS_NAME%" 2>NUL | find /I "%PROCESS_NAME%" >NUL
 if %ERRORLEVEL% EQU 0 (
     echo [WARN] 发现 %PROCESS_NAME% 残留进程，正在结束...
 
-    :: /F 强制结束，/IM 指定映像名，/T 结束子进程树
     taskkill /F /IM "%PROCESS_NAME%" /T
-
-    if !ERRORLEVEL! EQU 0 (
+    if %ERRORLEVEL% EQU 0 (
         echo [INFO] %PROCESS_NAME% 已成功结束。
     ) else (
-        echo [ERROR] 结束 %PROCESS_NAME% 失败，请以管理员身份运行此脚本。
+        echo [ERROR] 结束 %PROCESS_NAME% 失败。
     )
 ) else (
     echo [INFO] 未发现 %PROCESS_NAME% 残留进程。
