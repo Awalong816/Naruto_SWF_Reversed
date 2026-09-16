@@ -213,8 +213,8 @@ class ProxyManager:
                 # 使用 Popen 后台启动，不阻塞当前进程
                 self.proxy_handle = sub.Popen(
                     cmd,
-                    stdout=sub.PIPE,
-                    stderr=sub.PIPE,
+                    stdout=sub.DEVNULL,
+                    stderr=sub.DEVNULL, # 防止err通道单独塞满
                     text=True,
                     encoding='utf-8',
                     errors='ignore',
@@ -270,7 +270,7 @@ def get_proxy_manager(cfg: Configs):
 
 if __name__ == "__main__":
     cfgs = config.Configs()
-    cfgs.initialization_configs("../config.yaml")
+    cfgs.initialization_configs("E:\pythonProject\启动器\config.yaml")
 
     proxy_manager = get_proxy_manager(cfgs)
     proxy_manager.check_proxy_bridge()

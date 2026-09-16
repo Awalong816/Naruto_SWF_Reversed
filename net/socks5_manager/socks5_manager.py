@@ -7,6 +7,8 @@ import threading as th
 
 from config import Configs
 
+logging.basicConfig(level=logging.INFO)
+
 class Socks5Manager:
     def __init__(
             self,
@@ -159,14 +161,18 @@ class Socks5Manager:
                 protocol, command, signature, ip_type = self._recv_bytes(pipe_client, n)
                 if protocol != 0x05:
                     raise Exception(f"不是socks5协议")
-                if command != 0x01:
+                if command == 3:
+                    # REP=0x07：Command not supported
+                    self._handle_udp_associate(pipe_client)
+                    return
+                if command != 1:
                     """
                     01: CONNECT 建立tcp链接
                     02: BIND 绑定监听端口
                     03: UDP ASSOCIATE 建立udp转发通道
                     """
                     raise Exception(f"不支持的命令: {command}")
-                if signature != 0x00:
+                if signature != 0:
                     raise Exception(f"预留位异常")
                 # target host
                 """
@@ -351,6 +357,43 @@ class Socks5Manager:
         self.socket_handle = None
         self.socket_thread_handle = None
         logging.info(f"[INFO] Socks5 服务已关闭")
+
+    def _handle_udp_associate(self, pipe_client):
+        udp_socket = socket.socket(
+            socket.AF_INET,
+            socket.SOCK_DGRAM,
+        )
+        udp_socket.bind(("127.0.0.1", 0))
+
+        bind_host, bind_port = udp_socket.getsockname()
+
+        # REP=0：UDP ASSOCIATE建立成功
+        pipe_client.sendall(
+            b"\x05\x00\x00\x01"
+            + socket.inet_aton(bind_host)
+            + struct.pack("!H", bind_port)
+        )
+
+        logging.info(
+            f"[SOCKS5] UDP占位通道: "
+            f"{bind_host}:{bind_port}"
+        )
+
+        try:
+            # SOCKS5规定：TCP控制连接存在期间，UDP关联才有效
+            while not self.stop:
+                readable, _, _ = select.select(
+                    [pipe_client],
+                    [],
+                    [],
+                    1,
+                )
+
+                if pipe_client in readable:
+                    if not pipe_client.recv(1):
+                        break
+        finally:
+            udp_socket.close()
 
 
 def get_socks_manager(cfg: Configs):
