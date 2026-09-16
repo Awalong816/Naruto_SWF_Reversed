@@ -15,9 +15,9 @@ class Socks5Manager:
             host: str,
             port: int,
             max_input: int,
-            t_host_domain: str | list[str] = "",
-            t_host_ipv4: str | list[str] = "",
-            t_host_ipv6: str | list[str] = "",
+            t_host_domain: str | list[str] = None,
+            t_host_ipv4: str | list[str] = None,
+            t_host_ipv6: str | list[str] = None,
             ):
         # 基础
         self.server_host = host
@@ -27,16 +27,22 @@ class Socks5Manager:
         # 前序分析可能ip，作为白名单
         if type(t_host_domain) is str:
             self.host_domain_white_list = [t_host_domain]
+        elif t_host_domain is None:
+            self.host_domain_white_list = []
         else:
             self.host_domain_white_list = t_host_domain
 
         if type(t_host_ipv4) is str:
             self.host_ipv4_white_list = [t_host_ipv4]
+        elif t_host_ipv4 is None:
+            self.host_ipv4_white_list = []
         else:
             self.host_ipv4_white_list = t_host_ipv4
 
         if type(t_host_ipv6) is str:
             self.host_ipv6_white_list = [t_host_ipv6]
+        elif t_host_ipv6 is None:
+            self.host_ipv6_white_list = []
         else:
             self.host_ipv6_white_list = t_host_ipv6
 
@@ -159,6 +165,10 @@ class Socks5Manager:
             try:
                 n = 4
                 protocol, command, signature, ip_type = self._recv_bytes(pipe_client, n)
+                logging.info(
+                    f"[SOCKS5] 收到命令: "
+                    f"command={command}, ip_type={ip_type}"
+                )
                 if protocol != 0x05:
                     raise Exception(f"不是socks5协议")
                 if command == 3:
@@ -220,6 +230,10 @@ class Socks5Manager:
                     "tag_host": target_host,
                     "tag_port": target_port,
                 }
+                logging.info(
+                    f"[SOCKS5] 请求连接: "
+                    f"{target_host}:{target_port}"
+                )
             except Exception as err:
                 logging.warning(f"[WARN] tcp socket 通道-获取目标失败: {err}")
                 return
@@ -401,14 +415,19 @@ def get_socks_manager(cfg: Configs):
     port = int(cfg.net_proxy_prot or 19080)
     max_input_events = int(cfg.net_proxy_max_input_queue)
 
-    return Socks5Manager(host, port, max_input_events)
+    return Socks5Manager(
+        host=host,
+        port=port,
+        max_input=max_input_events,
+        t_host_domain=cfg.send_server_domain,
+        t_host_ipv4=cfg.send_server_ips
+    )
 
 
 if __name__ == "__main__":
     cfgs = Configs()
     cfgs.initialization_configs(r"E:\pythonProject\启动器\config.yaml")
-    cfgs.send_server_domain = "zone.huoying.qq.com"
-    cfgs.send_server_ips = [""]
+    cfgs.send_server_ips = ["101.226.142.64"]
 
     socks5_manager = get_socks_manager(cfgs)
     socks5_manager.start()

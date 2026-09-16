@@ -213,8 +213,8 @@ class ProxyManager:
                 # 使用 Popen 后台启动，不阻塞当前进程
                 self.proxy_handle = sub.Popen(
                     cmd,
-                    stdout=sub.DEVNULL,
-                    stderr=sub.DEVNULL, # 防止err通道单独塞满
+                    # stdout=sub.DEVNULL,
+                    # stderr=sub.DEVNULL, # 防止err通道单独塞满
                     text=True,
                     encoding='utf-8',
                     errors='ignore',

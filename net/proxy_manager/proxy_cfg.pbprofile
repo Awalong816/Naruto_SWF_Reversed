@@ -14,8 +14,8 @@
   ],
   "ProxyRules": [
     {
-      "ProcessName": "WebBrowserProcess.exe",
-      "TargetHosts": "*",
+      "ProcessName": "powershell.exe",
+      "TargetHosts": "101.226.142.64",
       "TargetPorts": "10494",
       "Protocol": "TCP",
       "Action": "PROXY",
