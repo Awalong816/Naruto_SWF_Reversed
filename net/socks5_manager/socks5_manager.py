@@ -61,6 +61,8 @@ class Socks5Manager:
         # 已经启动
         if not self.is_stop():
             return
+        else:
+            self.stop = False
 
         # ========= 配置socket =========
         # 创建socket类
@@ -87,6 +89,7 @@ class Socks5Manager:
             name="Socks5Server",  # 线程名字（方便调试）
             daemon=True,  # 守护线程, 随主线程结束而结束
         )
+        logging.info(f"[INFO] ⬆️ Socks5 代理监听启动中...")
         self.socket_thread_handle.start()
 
     def _listening(self):
@@ -128,114 +131,124 @@ class Socks5Manager:
         2. 连接目标
         3. 双向转发
         """
-        # 1.握手认证是socks5协议
+        target_pipe_client = None
         try:
-            n = 2 # 第一位协议，第二位认证方式: 无认证，用户密码认证...
-            result = self._recv_bytes(pipe_client, n)
-            protocol, method_num = result[0], result[1]
-            if protocol != 0x05:
-                raise TypeError(f"不是 socks5 协议")
+            # 1.握手认证是socks5协议
+            try:
+                n = 2  # 第一位协议，第二位认证方式: 无认证，用户密码认证...
+                result = self._recv_bytes(pipe_client, n)
+                protocol, method_num = result[0], result[1]
+                if protocol != 0x05:
+                    raise TypeError(f"不是 socks5 协议")
 
-            # 认证方法获取
-            methods = self._recv_bytes(pipe_client, method_num)
-            if 0x00 not in methods:
-                pipe_client.sendall(b'\x05\xff') # 拒绝握手
-                raise PermissionError(f"没有无认证方法")
+                # 认证方法获取
+                methods = self._recv_bytes(pipe_client, method_num)
+                if 0x00 not in methods:
+                    pipe_client.sendall(b'\x05\xff')  # 拒绝握手
+                    raise PermissionError(f"没有无认证方法")
 
-            # 选择认证方式
-            pipe_client.sendall(b'\x05\x00') # 选择除了无验证的其他方式需要等待客户端再发送内容，如用户名和密码 选择0则直接握手成功
-        except Exception as err:
-            logging.warning(f"[WARN] tcp socket 通道-握手失败: {err}")
-            return
+                # 选择认证方式
+                pipe_client.sendall(b'\x05\x00')  # 选择除了无验证的其他方式需要等待客户端再发送内容，如用户名和密码 选择0则直接握手成功
+            except Exception as err:
+                logging.warning(f"[WARN] tcp socket 通道-握手失败: {err}")
+                return
 
-        # 2.获取目标信息
-        try:
-            n = 4
-            protocol, command, signature, ip_type = self._recv_bytes(pipe_client, n)
-            if protocol != 0x05:
-                raise Exception(f"不是socks5协议")
-            if command != 0x01:
+            # 2.获取目标信息
+            try:
+                n = 4
+                protocol, command, signature, ip_type = self._recv_bytes(pipe_client, n)
+                if protocol != 0x05:
+                    raise Exception(f"不是socks5协议")
+                if command != 0x01:
+                    """
+                    01: CONNECT 建立tcp链接
+                    02: BIND 绑定监听端口
+                    03: UDP ASSOCIATE 建立udp转发通道
+                    """
+                    raise Exception(f"不支持的命令: {command}")
+                if signature != 0x00:
+                    raise Exception(f"预留位异常")
+                # target host
                 """
-                01: CONNECT 建立tcp链接
-                02: BIND 绑定监听端口
-                03: UDP ASSOCIATE 建立udp转发通道
+                * ip_type
+                01: ipv4 地址
+                03: 域名
+                04: ipv6 地址
                 """
-                raise Exception(f"不支持的命令: {command}")
-            if signature != 0x00:
-                raise Exception(f"预留位异常")
-            # target host
-            """
-            * ip_type
-            01: ipv4 地址
-            03: 域名
-            04: ipv6 地址
-            """
-            target_host = ""
-            if ip_type == b'\x01': # ipv4
-                data = self._recv_bytes(pipe_client, 4)
-                ipv4 = socket.inet_ntop(socket.AF_INET, data) # bytes -> str 默认的大端
-                if len(self.host_ipv4_white_list) > 0:
-                    if ipv4 in self.host_ipv4_white_list:
+                target_host = ""
+                if ip_type == 1:  # ipv4
+                    data = self._recv_bytes(pipe_client, 4)
+                    ipv4 = socket.inet_ntop(socket.AF_INET, data)  # bytes -> str 默认的大端
+                    if len(self.host_ipv4_white_list) > 0:
+                        if ipv4 in self.host_ipv4_white_list:
+                            target_host = ipv4
+                    else:
                         target_host = ipv4
-                else:
-                    target_host = ipv4
-            elif ip_type == b'\x03': # domain
-                length = self._recv_bytes(pipe_client, 1)[0] # **bytes索引是数值，切片还是bytes**
-                if length <= 0:
-                    raise Exception(f"目标域名长度解析错误")
-                data = self._recv_bytes(pipe_client, length)
-                domain = data.decode("idna")
-                if len(self.host_domain_white_list) > 0:
-                    if domain in self.host_domain_white_list:
+                elif ip_type == 3:  # domain
+                    length = self._recv_bytes(pipe_client, 1)[0]  # **bytes索引是数值，切片还是bytes**
+                    if length <= 0:
+                        raise Exception(f"目标域名长度解析错误")
+                    data = self._recv_bytes(pipe_client, length)
+                    domain = data.decode("idna")
+                    if len(self.host_domain_white_list) > 0:
+                        if domain in self.host_domain_white_list:
+                            target_host = domain
+                    else:
                         target_host = domain
-                else:
-                    target_host = domain
-            elif ip_type == b'\x04': # ipv6
-                data = self._recv_bytes(pipe_client, 16)
-                ipv6 = socket.inet_ntop(socket.AF_INET6, data)
-                if len(self.host_ipv6_white_list) > 0:
-                    if ipv6 in self.host_ipv6_white_list:
+                elif ip_type == 4:  # ipv6
+                    data = self._recv_bytes(pipe_client, 16)
+                    ipv6 = socket.inet_ntop(socket.AF_INET6, data)
+                    if len(self.host_ipv6_white_list) > 0:
+                        if ipv6 in self.host_ipv6_white_list:
+                            target_host = ipv6
+                    else:
                         target_host = ipv6
                 else:
-                    target_host = ipv6
-            else:
-                raise Exception(f"不支持的host请求")
-            # target port SOCKS5规定大端在前 高位在前
-            target_port = struct.unpack("!H", self._recv_bytes(pipe_client, 2))[0]
-            # 组成连接的上下文
-            context = {
-                "src_host": pipe_info[0],
-                "src_port": pipe_info[1],
-                "tag_host": target_host,
-                "tag_port": target_port,
-            }
-        except Exception as err:
-            logging.warning(f"[WARN] tcp socket 通道-获取目标失败: {err}")
-            return
+                    raise Exception(f"不支持的host请求")
+                # target port SOCKS5规定大端在前 高位在前
+                target_port = struct.unpack("!H", self._recv_bytes(pipe_client, 2))[0]
+                # 组成连接的上下文
+                context = {
+                    "src_host": pipe_info[0],
+                    "src_port": pipe_info[1],
+                    "tag_host": target_host,
+                    "tag_port": target_port,
+                }
+            except Exception as err:
+                logging.warning(f"[WARN] tcp socket 通道-获取目标失败: {err}")
+                return
 
-        # 3.连接目标服务器
-        try:
-            target_pipe_client = socket.create_connection(
-                (target_host, target_port),
-                timeout=30,
-            )
-            target_pipe_client.settimeout(None)
-            self.pipe_clients.add(target_pipe_client)
-            pipe_client.sendall(
-                b"\x05\x00\x00\x01"  # socks5版本，状态，标志位，host类型
-                b"\x00\x00\x00\x00"  # 绑定地址 不关心凑最小长度用
-                b"\x00\x00"  # 绑定端口 凑最小长度用
+            # 3.连接目标服务器
+            try:
+                target_pipe_client = socket.create_connection(
+                    (target_host, target_port),
+                    timeout=30,
+                )
+                target_pipe_client.settimeout(None)
+                self.pipe_clients.add(target_pipe_client)
+                pipe_client.sendall(
+                    b"\x05\x00\x00\x01"  # socks5版本，状态，标志位，host类型
+                    b"\x00\x00\x00\x00"  # 绑定地址 不关心凑最小长度用
+                    b"\x00\x00"  # 绑定端口 凑最小长度用
+                )
+            except Exception as err:
+                logging.warning(f"[WARN] tcp socket 通道-连接目标服务器失败: {err}")
+                return
+
+            # 4.双向转发
+            self._communication(
+                src_pipe=pipe_client,
+                tag_pipe=target_pipe_client,
+                context=context,
             )
         except Exception as err:
-            logging.warning(f"[WARN] tcp socket 通道-连接目标服务器失败: {err}")
-            return
-
-        # 4.双向转发
-        self._communication(
-            src_pipe=pipe_client,
-            tag_pipe=target_pipe_client,
-            context=context,
-        )
+            logging.warning(f"{err}")
+        # 链接失效后关闭通道
+        finally:
+            if pipe_client:
+                self._shutdown_socket(pipe_client)
+            if target_pipe_client:
+                self._shutdown_socket(target_pipe_client)
 
     def _recv_bytes(self, pipe: socket.socket, length: int):
         result = bytearray() # 可以序列化解包
@@ -245,6 +258,21 @@ class Socks5Manager:
                 raise ConnectionError(f"连接提前关闭")
             result.extend(data)
         return result
+
+    def _shutdown_socket(self, pipe: socket.socket):
+        # 删除追踪
+        with self.socket_lock:
+            self.pipe_clients.discard(pipe)
+        # 关闭
+        try:
+            pipe.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+
+        try:
+            pipe.close()
+        except OSError:
+            pass
 
     def _communication( # 一条连接链
             self,
@@ -267,11 +295,68 @@ class Socks5Manager:
             if wrongs:
                 return
 
+            if readable: # 触发了事件后
+                for sock in readable:
+                    event_data = sock.recv(65536) # 触发了事件后，不完整没关系，本身有可能是分块的
+                    if not event_data: # 得到空等于一段关闭了连接，正常一直阻塞
+                        if sock is src_pipe:
+                            logging.warning(f"[WARN] 游戏客户端与代理层断开连接")
+                        elif sock is tag_pipe:
+                            logging.warning(f"[WARN] 代理层与游戏服务器断开连接")
+                        return
+                    else:
+                        if sock is src_pipe:
+                            direction = "game->server"
+                            aim = tag_pipe
+                        elif sock is tag_pipe:
+                            direction = "server->game"
+                            aim = src_pipe
+                        else:
+                            continue
+
+                        aim.sendall(event_data)
+
+    def close(self):
+        logging.info(f"[INFO] Socks5 监听服务正在停止...")
+        # 退出所有循环
+        self.stop = True
+        # 删除所有已追踪通道并关闭
+        with self.socket_lock:
+            for pipe_client in self.pipe_clients:
+                try:
+                    pipe_client.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+                try:
+                    pipe_client.close()
+                except OSError:
+                    pass
+
+            self.pipe_clients.clear()
+
+        if self.socket_handle: # 关闭在端口的监听，停止accept()阻塞
+            self.socket_handle.close()
+
+        # 关闭线程
+        if self.socket_thread_handle and self.socket_thread_handle.is_alive():
+            # 4. 等待监听线程自行结束
+            thread = self.socket_thread_handle
+            thread.join(timeout=3)
+
+            if thread.is_alive():
+                logging.warning(
+                    "[WARN] SOCKS5监听线程未按时退出"
+                )
+
+        self.socket_handle = None
+        self.socket_thread_handle = None
+        logging.info(f"[INFO] Socks5 服务已关闭")
+
 
 def get_socks_manager(cfg: Configs):
     host = cfg.net_proxy_host or "127.0.0.1"
     port = int(cfg.net_proxy_prot or 19080)
-    max_input_events = int(cfgs.net_proxy_max_input_queue)
+    max_input_events = int(cfg.net_proxy_max_input_queue)
 
     return Socks5Manager(host, port, max_input_events)
 
@@ -279,5 +364,11 @@ def get_socks_manager(cfg: Configs):
 if __name__ == "__main__":
     cfgs = Configs()
     cfgs.initialization_configs(r"E:\pythonProject\启动器\config.yaml")
+    cfgs.send_server_domain = "zone.huoying.qq.com"
+    cfgs.send_server_ips = [""]
 
     socks5_manager = get_socks_manager(cfgs)
+    socks5_manager.start()
+    input(f"任意输入结束:")
+    socks5_manager.close()
+
