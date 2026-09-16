@@ -6,6 +6,7 @@ import shutil
 import logging
 from pathlib import Path
 
+import config
 from config import Configs
 
 logging.basicConfig(level=logging.INFO)
@@ -128,7 +129,7 @@ class ProxyManager:
 
             return True
         # mac
-        elif self.os_type == "mac" or os_type.lower() == "macos":
+        elif self.os_type == "mac" or self.os_type.lower() == "macos":
             try:
                 app_paths = [
                     Path("/Applications/ProxyBridge.app"),
@@ -145,7 +146,7 @@ class ProxyManager:
                 logging.error(f"[ERROR] proxy-bridge 检查失败: {err}")
 
         else:
-            logging.error(f"[ERROR]不支持代理系统: {os_type}")
+            logging.error(f"[ERROR]不支持代理系统: {self.os_type}")
 
         return False
 
@@ -268,6 +269,12 @@ def get_proxy_manager(cfg: Configs):
 
 
 if __name__ == "__main__":
-    os_type = "windows"
-    proxy_manager = ProxyManager(os_type)
+    cfgs = config.Configs()
+    cfgs.initialization_configs("../config.yaml")
+
+    proxy_manager = get_proxy_manager(cfgs)
     proxy_manager.check_proxy_bridge()
+
+    proxy_manager.start()
+    input(f"proxy 输入任意结束:")
+    proxy_manager.close()

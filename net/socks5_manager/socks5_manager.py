@@ -369,6 +369,6 @@ if __name__ == "__main__":
 
     socks5_manager = get_socks_manager(cfgs)
     socks5_manager.start()
-    input(f"任意输入结束:")
+    input(f"socks5 任意输入结束:")
     socks5_manager.close()
 
