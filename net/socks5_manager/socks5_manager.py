@@ -4,6 +4,7 @@ import select
 import struct
 import socket
 import threading as th
+from datetime import datetime
 
 from config import Configs
 
@@ -16,8 +17,10 @@ class Socks5Manager:
             port: int,
             max_input: int,
             t_host_domain: str | list[str] = None,
+            debug=False,
             ):
         # 基础
+        self.debug = debug
         self.server_host = host
         self.server_port = port
         self.stop = True # 循环开关
@@ -310,7 +313,42 @@ class Socks5Manager:
                         else:
                             continue
 
+                        if self.debug:
+                            self._show_data_view(context, event_data, direction)
+
                         aim.sendall(event_data)
+
+    def _show_data_view(self, context, data, direction):
+        print("*" * 100)
+        print(f"[EVENT] {direction}")
+        print(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"上下文: {context}")
+        print(f"长度: {len(data)}")
+        print(f"原始HEX: {data[:min(len(data),256)].hex(' ')}")
+        print(f"原始内容: {data}")
+        if len(data) >= 4:
+            read_way = data[2]
+            count_len = data[3]
+            if read_way == 0x00:
+                read_way_description = "大端"
+            else:
+                read_way_description = "小端"
+            print(f"有效数据体长度: {count_len}; 读取方式: {read_way_description}")
+        if len(data) >= 8:
+            command_type = data[4:8].hex('-')
+            print(f"动作/指令类型: {command_type}")
+        if len(data) >= 16:
+            direction_type = data[15]
+            direction_description = ""
+            if direction_type == 0x01:
+                direction_description = "1-客户端请求"
+            elif direction_type == 0x02:
+                direction_description = "2-服务器响应"
+            elif direction_type == 0x03:
+                direction_description = "3-服务器主动推送"
+            print(f"数据方向类型: {direction_description}")
+        print("*" * 100)
+        print("\n")
 
     def close(self):
         logging.info(f"[INFO] Socks5 监听服务正在停止...")
@@ -390,12 +428,14 @@ def get_socks_manager(cfg: Configs):
     host = cfg.net_proxy_host or "127.0.0.1"
     port = int(cfg.net_proxy_prot or 19080)
     max_input_events = int(cfg.net_proxy_max_input_queue)
+    debug = cfg.debug
 
     return Socks5Manager(
         host=host,
         port=port,
         max_input=max_input_events,
         t_host_domain=cfg.send_server_domain,
+        debug=debug,
     )
 
 
