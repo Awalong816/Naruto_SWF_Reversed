@@ -28,12 +28,15 @@ def _get_lzma_manager():
     return LZMAManager()
 
 
-def test_lzma_manager():
+def test_lzma_manager(test_path):
     lzma_manager = _get_lzma_manager()
-    test_path = r"/essence_resource/resource.cfg"
     decompressed_data = lzma_manager.decompress_file(test_path)
     return decompressed_data
 
 
 if __name__ == "__main__":
-    print(test_lzma_manager()[:50].hex(" "))
+    test_path = r"E:\pythonProject\启动器\essence_resource\flash\core\naruto.include.swf"
+    lzma_data = test_lzma_manager(test_path)
+    test_path = Path(test_path)
+    test_path.write_bytes(lzma_data)
+    print(f"解压重写入完成")

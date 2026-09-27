@@ -100,3 +100,18 @@ class NarutoServerDecryptManager:
 
 def get_naruto_server_decrypt_manager():
     return NarutoServerDecryptManager()
+
+
+def _file_test(path):
+    server = get_naruto_server_decrypt_manager()
+    test_data = path.read_bytes()
+    decrypt_data = server.decrypt(test_data)
+    return decrypt_data
+
+
+if __name__ == "__main__":
+    from pathlib import Path
+    test_path = Path(r"E:\pythonProject\启动器\essence_resource\flash\core\naruto.include.swf")
+    result = _file_test(test_path)
+    test_path.write_bytes(result)
+    print(f"解除混淆重新写入完成")

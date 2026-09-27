@@ -10,6 +10,7 @@ class Configs:
         self.after_resource_keywords = []
         # file_manager
         self.resource_save_path = ""
+        self.mods_path = ""
         # net_work
         self.net_max_connection = 50
         self.net_timeout = 60
@@ -44,6 +45,7 @@ class Configs:
             # file_manager
             file_manager_cfg = config_dict.get("file_manager", {})
             self.resource_save_path = str(file_manager_cfg.get("resource_save_path", "../essence_resource"))
+            self.mods_path = str(file_manager_cfg.get("mods_path", "../mods"))
 
             # net_work
             net_work_cfg = config_dict.get("net_work", {})

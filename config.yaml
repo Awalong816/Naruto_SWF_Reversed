@@ -8,6 +8,7 @@ resource_url:
 
 file_manager:
   resource_save_path: "./essence_resource"
+  mods_path: "./mods"
 
 net_work:
   max_connection: 50

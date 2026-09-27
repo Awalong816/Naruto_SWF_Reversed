@@ -6,6 +6,7 @@ import socket
 import threading as th
 from datetime import datetime
 
+from .data_packet_manager import get_data_packet_manager
 from config import Configs
 
 logging.basicConfig(level=logging.INFO)
@@ -24,6 +25,9 @@ class Socks5Manager:
         self.server_host = host
         self.server_port = port
         self.stop = True # 循环开关
+
+        # 工具组件
+        self.data_packet_manager = get_data_packet_manager()
 
         # 前序分析可能ip，作为白名单
         if type(t_host_domain) is str:
@@ -249,7 +253,8 @@ class Socks5Manager:
             if target_pipe_client:
                 self._shutdown_socket(target_pipe_client)
 
-    def _recv_bytes(self, pipe: socket.socket, length: int):
+    @staticmethod
+    def _recv_bytes(pipe: socket.socket, length: int):
         result = bytearray() # 可以序列化解包
         while len(result) < length:
             data = pipe.recv(length - len(result))
@@ -313,42 +318,18 @@ class Socks5Manager:
                         else:
                             continue
 
-                        if self.debug:
-                            self._show_data_view(context, event_data, direction)
+                        if self.data_packet_manager is not None:
+                            try:
+                                self.data_packet_manager.parse_data_packet(
+                                    data=event_data,
+                                    debug=self.debug,
+                                    context=context,
+                                    direction=direction,
+                                )
+                            except Exception as err:
+                                logging.warning(f"[WARN] {err}")
 
                         aim.sendall(event_data)
-
-    def _show_data_view(self, context, data, direction):
-        print("*" * 100)
-        print(f"[EVENT] {direction}")
-        print(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"上下文: {context}")
-        print(f"长度: {len(data)}")
-        print(f"原始HEX: {data[:min(len(data),256)].hex(' ')}")
-        print(f"原始内容: {data}")
-        if len(data) >= 4:
-            read_way = data[2]
-            count_len = data[3]
-            if read_way == 0x00:
-                read_way_description = "大端"
-            else:
-                read_way_description = "小端"
-            print(f"有效数据体长度: {count_len}; 读取方式: {read_way_description}")
-        if len(data) >= 8:
-            command_type = data[4:8].hex('-')
-            print(f"动作/指令类型: {command_type}")
-        if len(data) >= 16:
-            direction_type = data[15]
-            direction_description = ""
-            if direction_type == 0x01:
-                direction_description = "1-客户端请求"
-            elif direction_type == 0x02:
-                direction_description = "2-服务器响应"
-            elif direction_type == 0x03:
-                direction_description = "3-服务器主动推送"
-            print(f"数据方向类型: {direction_description}")
-        print("*" * 100)
-        print("\n")
 
     def close(self):
         logging.info(f"[INFO] Socks5 监听服务正在停止...")
