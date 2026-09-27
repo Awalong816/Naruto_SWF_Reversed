@@ -1,65 +1,58 @@
+import logging
 from datetime import datetime
+
+logging.basicConfig(level=logging.INFO)
+
+class DataPack:
+    def __init__(self, **kwargs):
+        self.direction = kwargs.get("direction")
+        self.direction_type = kwargs.get("direction_type")
+        self.context = kwargs.get("context")
+        self.time_stamp = kwargs.get("time_stamp")
+        self.command_id = kwargs.get("command_id")
+        self.count = kwargs.get("count")
+        self.data = kwargs.get("data")
+
+    def update_data(self, data: bytes):
+        self.data = data
 
 
 class DataPacketManager:
     def __init__(self):
-        self.version = "26.9.28"
+        self.header_size = 36
+        self.magic = b'\x09\x01'
+        self.cache = {
+            "game->server": bytearray(),
+            "server->game": bytearray(),
+        }
 
-    @staticmethod
-    def parse_data_packet(data: bytes, debug=False, **kwargs):
-        context = kwargs.get("context")
-        direction = kwargs.get("direction")
+    def completed_data_stream(self, direction: str, data: bytes):
+        """
+        **一对n核心**
+        一段数据输出0~n个完整包，不负责分析，只负责切分
+        :param direction:
+        :param data:
+        :return:
+        """
+        buffer = self.cache.get(direction)
+        buffer.extend(data)
+        completed_datas = []
 
-        length = len(data)
-        if length < 36:
-            raise ValueError("数据长度不符合要求")
+        while len(buffer) >= self.header_size: # 协议本身允许出现body长度为0的整包
+            if buffer[:2] != self.magic:
+                raise Exception("失去同步")
+            count = int.from_bytes(
+                buffer[2:4],
+                "big",
+            )
+            if len(buffer) >= self.header_size + count:
+                completed_datas.append(bytes(buffer[:self.header_size + count]))
+                del buffer[:self.header_size + count]
+            else:
+                break
 
-        _magic = data[:2]
-        _count = data[2:4]
-        _command_id = data[4:8]
-        _request_id = data[8:12]
-        _direction_type = data[12:16]
-        # _role_id = data[28:30]
-        # _server_id = data[30:32]
-        # _client_ip = data[32:36]
+        return completed_datas
 
-        if _magic != b'\x00\x01':
-            raise ValueError(f"协议头magic不符合要求: {_magic}")
-
-        command_id = int.from_bytes(_command_id, "big")
-        direction_type = _direction_type[-1]
-
-        if _count[0] == 1:
-            count = int.from_bytes(_count, "little")
-        else:
-            count = int.from_bytes(_count, "big")
-        body_start = 36
-        body_end = body_start + count
-
-        body = data[body_start:body_end]
-
-        if debug:
-            print("*" * 100)
-            print(f"[EVENT] {direction}")
-            print(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            print(f"上下文: {context}")
-            print(f"长度: {length}")
-            print(f"原始内容: {data}")
-            print(f"原始HEX: {data[:min(len(data), 256)].hex(' ')}\n")
-
-            print(f"有效数据体长度: {count}")
-            print(f"动作/指令 ID: {command_id}")
-
-            direction_description = ""
-            if direction_type == 0x01:
-                direction_description = "1-客户端请求"
-            elif direction_type == 0x02:
-                direction_description = "2-服务器响应"
-            elif direction_type == 0x03:
-                direction_description = "3-服务器主动推送"
-            print(f"数据方向类型: {direction_description}")
-            print("*" * 100)
-            print("\n")
 
 def get_data_packet_manager():
     return DataPacketManager()

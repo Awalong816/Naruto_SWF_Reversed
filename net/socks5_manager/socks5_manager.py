@@ -6,7 +6,7 @@ import socket
 import threading as th
 from datetime import datetime
 
-from .data_packet_manager import get_data_packet_manager
+from net.socks5_manager.data_packet_manager import get_data_packet_manager
 from config import Configs
 
 logging.basicConfig(level=logging.INFO)
@@ -318,16 +318,8 @@ class Socks5Manager:
                         else:
                             continue
 
-                        if self.data_packet_manager is not None:
-                            try:
-                                self.data_packet_manager.parse_data_packet(
-                                    data=event_data,
-                                    debug=self.debug,
-                                    context=context,
-                                    direction=direction,
-                                )
-                            except Exception as err:
-                                logging.warning(f"[WARN] {err}")
+                        if self.data_packet_manager is not None: # 不是一次发送对应一个完整包，是一对n包括0
+                            pass
 
                         aim.sendall(event_data)
 
