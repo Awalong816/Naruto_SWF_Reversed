@@ -26,9 +26,6 @@ class Socks5Manager:
         self.server_port = port
         self.stop = True # 循环开关
 
-        # 工具组件
-        self.data_packet_manager = get_data_packet_manager()
-
         # 前序分析可能ip，作为白名单
         if type(t_host_domain) is str:
             self.host_domain_white_list = [t_host_domain]
@@ -279,11 +276,13 @@ class Socks5Manager:
             pass
 
     def _communication( # 一条连接链
-            self,
-            src_pipe: socket.socket,
-            tag_pipe: socket.socket,
-            context: dict=None,
-        ):
+        self,
+        src_pipe: socket.socket,
+        tag_pipe: socket.socket,
+        context: dict | None,
+    ):
+
+        data_packet_manager = get_data_packet_manager()
         sockets = [src_pipe, tag_pipe]
 
         while not self.is_stop():
@@ -318,8 +317,8 @@ class Socks5Manager:
                         else:
                             continue
 
-                        if self.data_packet_manager is not None: # 不是一次发送对应一个完整包，是一对n包括0
-                            self.data_packet_manager.parse_data(
+                        if data_packet_manager is not None: # 不是一次发送对应一个完整包，是一对n包括0
+                            data_packet_manager.parse_data(
                                 context=context,
                                 direction=direction,
                                 data=event_data,
