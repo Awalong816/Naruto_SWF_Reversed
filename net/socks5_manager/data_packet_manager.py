@@ -10,11 +10,15 @@ class DataPack:
         self.context = kwargs.get("context")
         self.time_stamp = kwargs.get("time_stamp")
         self.command_id = kwargs.get("command_id")
+        self.command_info = kwargs.get("command_info")
         self.count = kwargs.get("count")
         self.data = kwargs.get("data")
 
     def update_data(self, data: bytes):
         self.data = data
+
+    def parse_command_info(self):
+        pass
 
 
 class DataPacketManager:
@@ -52,6 +56,53 @@ class DataPacketManager:
                 break
 
         return completed_datas
+
+
+    def parse_data(self, context, direction: str, data: bytes, debug=False):
+        time_stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            completed_datas = self.completed_data_stream(direction, data) # 粘包不改变方向
+            if not completed_datas:
+                return
+            data_packets = []
+            for completed_data in completed_datas:
+                data_packet = DataPack(
+                    direction=direction,
+                    direction_type=completed_data[15],
+                    context=context,
+                    time_stamp=time_stamp,
+                    command_id=int.from_bytes(completed_data[4:8],"big"),
+                    count=int.from_bytes(completed_data[2:4],"big"),
+                    data=completed_data,
+                )
+                if debug:
+                    self._report(data_packet)
+                data_packets.append(data_packet)
+
+        except Exception as err:
+            logging.warning(f"[WARN] {err}")
+
+    @staticmethod
+    def _report(data_pack: DataPack):
+        print("*"*100)
+        print(f"[EVENT] {data_pack.direction}")
+        print(f"时间: {data_pack.time_stamp}")
+        print(f"上下文: {data_pack.context}")
+        print(f"类型: ",end="")
+        if data_pack.direction_type == 1:
+            print("客户端请求")
+        elif data_pack.direction_type == 2:
+            print("服务器响应")
+        elif data_pack.direction_type == 3:
+            print("服务器推送")
+        else:
+            print("未知")
+        print(f"指令/动作 ID: {data_pack.command_id}")
+        print(f"有效长度: {data_pack.count}")
+        print(f"原始字节流: {data_pack.data}")
+        print(f"原始字节HEX: {data_pack.data[:min(len(data_pack.data),256)].hex(' ')}")
+        print("*"*100)
+        print("\n")
 
 
 def get_data_packet_manager():

@@ -319,7 +319,12 @@ class Socks5Manager:
                             continue
 
                         if self.data_packet_manager is not None: # 不是一次发送对应一个完整包，是一对n包括0
-                            pass
+                            self.data_packet_manager.parse_data(
+                                context=context,
+                                direction=direction,
+                                data=event_data,
+                                debug=self.debug,
+                            )
 
                         aim.sendall(event_data)
 
