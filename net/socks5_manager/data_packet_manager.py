@@ -76,14 +76,14 @@ class DataPacketManager:
                     data=completed_data,
                 )
                 if debug:
-                    self._report(data_packet)
+                    self._log_report(data_packet)
                 data_packets.append(data_packet)
 
         except Exception as err:
             logging.warning(f"[WARN] {err}")
 
     @staticmethod
-    def _report(data_pack: DataPack):
+    def _log_report(data_pack: DataPack):
         print("*"*100)
         print(f"[EVENT] {data_pack.direction}")
         print(f"时间: {data_pack.time_stamp}")

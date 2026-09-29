@@ -45,7 +45,7 @@ class Configs:
             # file_manager
             file_manager_cfg = config_dict.get("file_manager", {})
             self.resource_save_path = str(file_manager_cfg.get("resource_save_path", "../essence_resource"))
-            self.mods_path = str(file_manager_cfg.get("mods_path", "../mods"))
+            self.mods_path = str(file_manager_cfg.get("mods_path", "../mod"))
 
             # net_work
             net_work_cfg = config_dict.get("net_work", {})
