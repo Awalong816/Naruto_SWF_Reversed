@@ -29,7 +29,7 @@ class Configs:
         self.send_server_prot = -1
 
     def initialization_configs(self, config_path="./config.yaml"):
-        with open(config_path, "r") as file:
+        with open(config_path, "r", encoding="utf-8") as file:
             config_dict = dict(yaml.safe_load(file))
             # resource_url
             resource_url_cfg = config_dict.get("resource_url", {})
@@ -44,8 +44,8 @@ class Configs:
 
             # file_manager
             file_manager_cfg = config_dict.get("file_manager", {})
-            self.resource_save_path = str(file_manager_cfg.get("resource_save_path", "../essence_resource"))
-            self.mods_path = str(file_manager_cfg.get("mods_path", "../mod"))
+            self.resource_save_path = str(file_manager_cfg.get("resource_save_path")) or "./essence_resource"
+            self.mods_path = str(file_manager_cfg.get("mods_path")) or "./mods"
 
             # net_work
             net_work_cfg = config_dict.get("net_work", {})

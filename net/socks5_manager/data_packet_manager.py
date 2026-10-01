@@ -1,18 +1,20 @@
 import logging
 from datetime import datetime
+from typing import Any
+from dataclasses import dataclass
 
 logging.basicConfig(level=logging.INFO)
 
+@dataclass
 class DataPack:
-    def __init__(self, **kwargs):
-        self.direction = kwargs.get("direction")
-        self.direction_type = kwargs.get("direction_type")
-        self.context = kwargs.get("context")
-        self.time_stamp = kwargs.get("time_stamp")
-        self.command_id = kwargs.get("command_id")
-        self.command_info = kwargs.get("command_info")
-        self.count = kwargs.get("count")
-        self.data = kwargs.get("data")
+    direction: str
+    direction_type: int
+    context: str | dict
+    time_stamp: str
+    command_id: int
+    count: int
+    data: bytes
+    command_info: Any = None
 
     def update_data(self, data: bytes):
         self.data = data
@@ -76,14 +78,19 @@ class DataPacketManager:
                     data=completed_data,
                 )
                 if debug:
-                    self._log_report(data_packet)
+                    self._log_report(data_packet, [198935, 198936])
                 data_packets.append(data_packet)
-
+            # TODO 交给mod管理器中添加的mod方法路由处理，修改完后返回至转发
         except Exception as err:
             logging.warning(f"[WARN] {err}")
+            return
 
     @staticmethod
-    def _log_report(data_pack: DataPack):
+    def _log_report(data_pack: DataPack, aim_id=None):
+        if aim_id:
+            if data_pack.command_id not in aim_id:
+                return
+
         print("*"*100)
         print(f"[EVENT] {data_pack.direction}")
         print(f"时间: {data_pack.time_stamp}")

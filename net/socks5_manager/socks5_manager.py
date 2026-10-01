@@ -8,6 +8,7 @@ from datetime import datetime
 
 from net.socks5_manager.data_packet_manager import get_data_packet_manager
 from config import Configs
+from utils import get_mod_manager
 
 logging.basicConfig(level=logging.INFO)
 
@@ -18,6 +19,7 @@ class Socks5Manager:
             port: int,
             max_input: int,
             t_host_domain: str | list[str] = None,
+            mods_path: str = None,
             debug=False,
             ):
         # 基础
@@ -25,6 +27,10 @@ class Socks5Manager:
         self.server_host = host
         self.server_port = port
         self.stop = True # 循环开关
+
+        # 组件
+        # # mod
+        self.mods_manager = get_mod_manager(mods_path)
 
         # 前序分析可能ip，作为白名单
         if type(t_host_domain) is str:
@@ -405,6 +411,7 @@ def get_socks_manager(cfg: Configs):
     host = cfg.net_proxy_host or "127.0.0.1"
     port = int(cfg.net_proxy_prot or 19080)
     max_input_events = int(cfg.net_proxy_max_input_queue)
+    mods_path = cfg.mods_path
     debug = cfg.debug
 
     return Socks5Manager(
@@ -412,6 +419,7 @@ def get_socks_manager(cfg: Configs):
         port=port,
         max_input=max_input_events,
         t_host_domain=cfg.send_server_domain,
+        mods_path=mods_path,
         debug=debug,
     )
 
