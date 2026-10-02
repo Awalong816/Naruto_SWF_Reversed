@@ -84,7 +84,7 @@ class DataPacketManager:
             data_packets = []
             for completed_data in completed_datas:
                 direction_type = completed_data[15]
-                command_id = int.from_bytes(completed_data[2:4],"big")
+                command_id = int.from_bytes(completed_data[4:8],"big")
                 count = int.from_bytes(completed_data[2:4],"big")
                 if command_id in self.decrypt_need_command_id:
                     value_data = self.decrypt_manager.decrypt_data(completed_data)

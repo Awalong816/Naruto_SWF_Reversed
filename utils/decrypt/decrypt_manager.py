@@ -27,7 +27,7 @@ class DecryptManager:
 
     def decrypt_data(self, data: bytes):
         result = self.DataCryptServer.decrypt(data)
-        return result["body"]
+        return result["data"]
 
     def encrypt_action_spec(self, action_spec: dict):
         pass
