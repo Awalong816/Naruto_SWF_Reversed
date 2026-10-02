@@ -33,6 +33,15 @@ class Session:
     )
 
     context: str | None
+    uin: str | None # 当前账号
+    role_id: str | None # 当前角色名
+    server_id: str | None # 当前区服
+    client_ip: int = 0
+    timeout: float = 0.0
+    # TODO request_id在额外动作时使用高半区位置, 容易被反追踪暴露, 尝试是否可行:服务器是否检察相连的请求是否连号
+    extra_action_request_id: int = 0x80000000
+    extra_action_request_id_range: tuple = (0x80000000, 0xFFFFFFFF)
+
     closed: th.Event = field(
         default_factory=th.Event,
         init=False,
@@ -346,6 +355,13 @@ class Socks5Manager:
         tag_pipe: socket.socket, # 接收通道
         context: dict | None,
     ):
+        """
+        客户端向服务器发送数据中 *request_id* 是从0x0000001到0xFFFFFFFF顺序循环
+        :param src_pipe:
+        :param tag_pipe:
+        :param context:
+        :return:
+        """
         # 每个会话都有专属的数据分析器
         session = Session(
             client_socket=src_pipe,
@@ -394,6 +410,8 @@ class Socks5Manager:
                             "direction": original_direction,
                             "data": event_data,
                         })
+                    else:
+                        continue
 
                     if data_packet_manager is not None: # 不是一次发送对应一个完整包，是一对n包括0
                         data_packets = data_packet_manager.parse_data(
@@ -402,6 +420,12 @@ class Socks5Manager:
                             data=event_data,
                             debug=self.debug,
                         )
+                        # 首次打通将头部固定不变的内容写入会话属性
+                        if not session.uin or not session.role_id or session.server_id:
+                            if len(data_packets) > 0:
+                                session.uin = data_packets[0].uin
+                                session.role_id = data_packets[0].role_id
+                                session.server_id = data_packets[0].server_id
 
                     for action in action_packet_queue:
                         session.send(action["direction"], action["data"])

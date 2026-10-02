@@ -53,6 +53,8 @@ class GameDataCryptManager:
         plain_body = self._qq_tea_decrypt(
             encrypted_body
         )
+        all_data = bytearray()
+        all_data.extend(data[:self.HEADER_SIZE])
 
         result = {
             "command_id": int.from_bytes(
@@ -90,7 +92,7 @@ class GameDataCryptManager:
             "body_length": body_length,
             "encrypted_body": encrypted_body,
             "body": plain_body,
-            "data": data,
+            "all_data": all_data.extend(plain_body),
         }
 
         self.protocol_state["uin"] = result["uin"]
@@ -471,17 +473,137 @@ def get_game_data_crypt_manager():
 
 
 if __name__ == "__main__":
+    import json
+
+    def _read_varint(data: bytes, position: int):
+        value = 0
+        shift = 0
+
+        while position < len(data):
+            current = data[position]
+            position += 1
+
+            value |= (current & 0x7F) << shift
+
+            if current < 0x80:
+                return value, position
+
+            shift += 7
+
+            if shift >= 64:
+                raise ValueError("Varint过长")
+
+        raise ValueError("Varint数据不完整")
+
+
+    def _read_protobuf(data: bytes, depth=0):
+        position = 0
+        fields = []
+
+        while position < len(data):
+            key, position = _read_varint(data, position)
+
+            field_number = key >> 3
+            wire_type = key & 0x07
+
+            if field_number == 0:
+                raise ValueError("非法Protobuf字段号0")
+
+            item = {
+                "field": field_number,
+                "wire_type": wire_type,
+            }
+
+            # Varint：int、uint、bool、enum等
+            if wire_type == 0:
+                value, position = _read_varint(data, position)
+                item["value"] = value
+
+            # 64位定长数据：fixed64、double等
+            elif wire_type == 1:
+                if position + 8 > len(data):
+                    raise ValueError("fixed64数据不完整")
+
+                raw = data[position:position + 8]
+                position += 8
+
+                item["value"] = int.from_bytes(raw, "little")
+                item["hex"] = raw.hex(" ")
+
+            # 字符串、bytes、嵌套message
+            elif wire_type == 2:
+                length, position = _read_varint(data, position)
+                end = position + length
+
+                if end > len(data):
+                    raise ValueError("length-delimited数据不完整")
+
+                raw = data[position:end]
+                position = end
+
+                item["length"] = length
+
+                # 优先尝试UTF-8文本
+                try:
+                    text = raw.decode("utf-8")
+
+                    if text.isprintable():
+                        item["value"] = text
+                    else:
+                        raise UnicodeDecodeError(
+                            "utf-8", raw, 0, len(raw), "不可打印字符"
+                        )
+
+                except (UnicodeDecodeError, ValueError):
+                    # 再尝试作为嵌套Protobuf
+                    try:
+                        if raw and depth < 5:
+                            item["value"] = _read_protobuf(
+                                raw,
+                                depth + 1,
+                            )
+                        else:
+                            item["hex"] = raw.hex(" ")
+
+                    except Exception:
+                        item["hex"] = raw.hex(" ")
+
+            # 32位定长数据：fixed32、float等
+            elif wire_type == 5:
+                if position + 4 > len(data):
+                    raise ValueError("fixed32数据不完整")
+
+                raw = data[position:position + 4]
+                position += 4
+
+                item["value"] = int.from_bytes(raw, "little")
+                item["hex"] = raw.hex(" ")
+
+            else:
+                raise ValueError(f"暂不支持wire_type={wire_type}")
+
+            fields.append(item)
+
+        return fields
+
+
+    def protobuf_to_readable(body: bytes) -> str:
+        """
+        body必须是：
+        1. 已完成TEA解密
+        2. 不包含36字节游戏协议头
+        """
+        result = _read_protobuf(body)
+
+        return json.dumps(
+            result,
+            ensure_ascii=False,
+            indent=2,
+        )
+
     server = GameDataCryptManager()
     test_data = b'\t\x01\x01\xe8\x00\x03\t\x17\x00\x00\x01i\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00G_I\x8a\x00\x00\x01\xfa\x00\x00\x00\x00iu\x87ym\xfc\x88\xa7I\x8d\x8a#`\xcd}H\x9bT@b3\x1d\xf6\x06\x1b\xcf\x16\xa8x=\xc8v\x1ct\xb4\xa7&\xefUbH\x00z\xc4\x8a\xd5\xa0W6\xa0Q\x0e\xa1\xadd\xb4mIH\x1d\xd2=\xcb\x7f\xc6\x94\xac\xfb\x9cM\x87\x04\x18bz\xd3/\xb5\x7f\x06r\xeb\xa9CM\xde\x8c\xd8k\xd7d\x7ff9\xd4\xce\xbd\xa3\xe4\x11#\x97C\xfb\xe5\x8d1.\xc6\x01\x85\xc9q\xd9\xb6\x0b\xebB~\xaf$j\x87\x13\xd15\xae{rcK\xectX\xbe\x17I\xf2!\xc0\x16\xb9\x9bc\xe2Op]L\xcf4\x91\xc9\x02\x00\x0f\x11\xe7\xf5\x86\x04;\xae%"\x9d\xdb\xf6\xe5\xbf1\xa2W\x9f\x83\xa2\x86\xa6\xbbB\xb7\x12\xaf\x11\xb8\xce#\xb0Z\xf6\x83\xe0,\xd0\xb7Le\xe3\xcb\xb5\x16c\n\xa5\xd5\x9d\x84\n\xee\x98\x8a\x05\xdb\xe3\xca0\xd8\n\xc6+\xb7\x86j\x8b\xd0\xd2\x9b\x8c,\xb5\xbc\xd4\x95\xa2\x06\xfc\xd3N\xe4\xf8\xdb\xee\x90f\xe1\xe6\xa8\xd5\xe3{#=\xce\xf3p\to|\xc7\xc53\x8a\xd6\x17\x7fqf\x97k[\xea]E\xf1o\x1fOo\xf5\xdd\xf2\xc9\x03\x89\x8as\xce0U\x81\x07\xd7=\x85\x97?\xc1\xaf\xa0\xf5\xcf\xe6\x9a\xccf\xc5\xd6\x95\x96\xc5.\xd9\xa3.\xb6J\xe8\x11\x07\xe2\x8ev\xdb\xf9\xc9\x80\x9f-H\xe4\x03\x1f\x9c\xeb\xe2]\x01\xeb\x062sy\x8e\x07=\xc8HY\xdb\xf4\x86\xe1E<\xb1J\x84`\xed\x13\xa18tg\xcd\x13\xb1\xa4iju\xfe\xf0\x9c\xdf\x1fg\xc9$\xa1\xf9\xa9yjJ\xca\x8d\x08\x93?QI\x17U\x9e\n\xd9\x8e>\xb7\x0e\x07d2\x1aD\x8b\xc0\xf8\x87&t2=`~>`\xdf\x90\x99`\x8bE<\xe2\xe7\x05\xc6\x17\x13\xc1\x19\xf6\xf4\xf9`\x00k\x00$\x1c\xb5Gqa\x8f\xa8D\xdd\x8d\x0f\x9a\x92\xd2\x99M\xf5\x9c\xe3\x06@W\x964\xf9\xc4j\xa8\xb4<\xf1\xd5\xa9\xdb5)\xbd\xe5#\xa6_8\xab\n\xa9\xfd\x1e'
-    result = server.decrypt(test_data)
-    print(result)
+    result = server.decrypt(test_data)["body"]
+    readable_result = protobuf_to_readable(result)
 
-    print("command_id:", result["command_id"])
-    print("request_id:", result["request_id"])
-    print("message_type:", result["message_type"])
-
-    print("密文长度:", len(result["encrypted_body"]))
-    print("明文长度:", len(result["body"]))
-
-    print("protobuf HEX:")
-    print(result["body"].hex(" "))
+    print(readable_result)

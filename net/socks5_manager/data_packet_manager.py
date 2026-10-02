@@ -12,17 +12,18 @@ class DataPack:
     direction: str
     direction_type: int
     context: str | dict
+    uin: int # 当前账号
+    role_id: int # 当前角色
+    server_id: int # 当前服务器
     time_stamp: str
     command_id: int
     count: int
-    data: bytes
-    command_info: Any = None
+    value_data: bytes
+    is_decrypted: bool
+    request_id: int | None
 
     def update_data(self, data: bytes):
-        self.data = data
-
-    def parse_command_info(self):
-        pass
+        self.value_data = data
 
 
 class DataPacketManager:
@@ -83,21 +84,33 @@ class DataPacketManager:
                 return
             data_packets = []
             for completed_data in completed_datas:
-                direction_type = completed_data[15]
-                command_id = int.from_bytes(completed_data[4:8],"big")
                 count = int.from_bytes(completed_data[2:4],"big")
+                command_id = int.from_bytes(completed_data[4:8],"big")
+                request_id = int.from_bytes(completed_data[8:12],"big")
+                direction_type = int.from_bytes(completed_data[12:16],"big")
+                uin = int.from_bytes(completed_data[24:28],"big")
+                role_id = int.from_bytes(completed_data[28:30],"big")
+                server_id = int.from_bytes(completed_data[30:32],"big")
                 if command_id in self.decrypt_need_command_id:
                     value_data = self.decrypt_manager.decrypt_data(completed_data)
+                    is_decrypted = True
                 else:
                     value_data = completed_data
+                    is_decrypted = False
+
                 data_packet = DataPack(
                     direction=direction,
                     direction_type=direction_type,
                     context=context,
+                    uin=uin,
+                    role_id=role_id,
+                    server_id=server_id,
+                    request_id=request_id,
                     time_stamp=time_stamp,
                     command_id=command_id,
                     count=count,
-                    data=value_data,
+                    value_data=value_data,
+                    is_decrypted=is_decrypted,
                 )
                 if debug:
                     self._log_report(data_packet,)
@@ -132,8 +145,8 @@ class DataPacketManager:
             print("未知")
         print(f"指令/动作 ID: {data_pack.command_id}")
         print(f"有效长度: {data_pack.count}")
-        print(f"原始字节流: {data_pack.data}")
-        print(f"原始字节HEX: {data_pack.data[:min(len(data_pack.data),256)].hex(' ')}")
+        print(f"内容部分原始字节流: {data_pack.value_data}")
+        print(f"内容部分原始字节HEX: {data_pack.value_data[:min(len(data_pack.value_data),256)].hex(' ')}")
         print("*"*100)
         print("\n")
 
