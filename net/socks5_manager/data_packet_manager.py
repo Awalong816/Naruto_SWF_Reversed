@@ -35,13 +35,12 @@ class DataPacketManager:
         }
 
         self.decrypt_manager = get_decrypt_manger()
-        self.decrypt_ignore_command_id = [
-            65537,
-            327681,
+        self.decrypt_need_command_id = [
+            198935,
+            198936,
         ]
 
     def build_action_packet(self, action_spec: dict):
-
         pass
 
     def completed_data_stream(self, direction: str, data: bytes):
@@ -84,14 +83,21 @@ class DataPacketManager:
                 return
             data_packets = []
             for completed_data in completed_datas:
+                direction_type = completed_data[15]
+                command_id = int.from_bytes(completed_data[2:4],"big")
+                count = int.from_bytes(completed_data[2:4],"big")
+                if command_id in self.decrypt_need_command_id:
+                    value_data = self.decrypt_manager.decrypt_data(completed_data)
+                else:
+                    value_data = completed_data
                 data_packet = DataPack(
                     direction=direction,
-                    direction_type=completed_data[15],
+                    direction_type=direction_type,
                     context=context,
                     time_stamp=time_stamp,
-                    command_id=int.from_bytes(completed_data[4:8],"big"),
-                    count=int.from_bytes(completed_data[2:4],"big"),
-                    data=completed_data,
+                    command_id=command_id,
+                    count=count,
+                    data=value_data,
                 )
                 if debug:
                     self._log_report(data_packet,)

@@ -105,7 +105,6 @@ class GameDataCryptManager:
 
         action_spec最低要求：
         {
-            "direction": "game->server",
             "command_id": 198935,
             "body": b"",
         }
