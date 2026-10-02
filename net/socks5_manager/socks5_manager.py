@@ -421,11 +421,10 @@ class Socks5Manager:
                             debug=self.debug,
                         )
                         # 首次打通将头部固定不变的内容写入会话属性
-                        if not session.uin or not session.role_id or session.server_id:
-                            if len(data_packets) > 0:
-                                session.uin = data_packets[0].uin
-                                session.role_id = data_packets[0].role_id
-                                session.server_id = data_packets[0].server_id
+                        if data_packets and len(data_packets) > 0:
+                            session.uin = data_packets[0].uin
+                            session.role_id = data_packets[0].role_id
+                            session.server_id = data_packets[0].server_id
 
                     for action in action_packet_queue:
                         session.send(action["direction"], action["data"])

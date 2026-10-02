@@ -53,8 +53,7 @@ class GameDataCryptManager:
         plain_body = self._qq_tea_decrypt(
             encrypted_body
         )
-        all_data = bytearray()
-        all_data.extend(data[:self.HEADER_SIZE])
+        all_data = bytes(data[:self.HEADER_SIZE]) + plain_body
 
         result = {
             "command_id": int.from_bytes(
@@ -92,7 +91,7 @@ class GameDataCryptManager:
             "body_length": body_length,
             "encrypted_body": encrypted_body,
             "body": plain_body,
-            "all_data": all_data.extend(plain_body),
+            "all_data": all_data,
         }
 
         self.protocol_state["uin"] = result["uin"]
