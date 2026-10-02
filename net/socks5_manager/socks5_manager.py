@@ -5,12 +5,70 @@ import struct
 import socket
 import threading as th
 from datetime import datetime
+from dataclasses import dataclass, field
 
 from net.socks5_manager.data_packet_manager import get_data_packet_manager
+from net.socks5_manager.mod_manager import get_mod_manager
 from config import Configs
-from utils import get_mod_manager
 
 logging.basicConfig(level=logging.INFO)
+
+# 方法类: 会话，可以控制自主收发
+@dataclass
+class Session:
+    client_socket: socket.socket
+    server_socket: socket.socket
+
+    manager_stopped: th.Event
+
+    _to_client_mu: th.Lock = field(
+        default_factory=th.Lock,
+        init=False,
+        repr=False,
+    )
+    _to_server_mu: th.Lock = field(
+        default_factory=th.Lock,
+        init=False,
+        repr=False,
+    )
+
+    context: str | None
+    closed: th.Event = field(
+        default_factory=th.Event,
+        init=False,
+        repr=False,
+    )
+
+    def is_closed(self):
+        result = self.closed.is_set() or self.manager_stopped.is_set()
+        return result
+
+    def send(self, direction: str, data: bytes):
+        if self.is_closed():
+            raise ConnectionError(
+                f"当前会话已关闭"
+            )
+        if not data:
+            return
+
+        if direction == "game->server":
+            with self._to_server_mu:
+                self.server_socket.sendall(data)
+        elif direction == "server->game":
+            with self._to_client_mu:
+                self.client_socket.sendall(data)
+
+    def close(self):
+        if self.closed.is_set():
+            return
+
+        self.closed.set()
+        for sock in (self.client_socket, self.server_socket):
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+
 
 class Socks5Manager:
     def __init__(
@@ -26,7 +84,8 @@ class Socks5Manager:
         self.debug = debug
         self.server_host = host
         self.server_port = port
-        self.stop = True # 循环开关
+        self.stop_signal = th.Event()
+        self.stop_signal.set() # true是停止
 
         # 组件
         # # mod
@@ -51,7 +110,7 @@ class Socks5Manager:
         self.max_input_queue = max_input
 
     def is_stop(self):
-        return self.stop
+        return self.stop_signal.is_set()
 
     def start(self):
         """
@@ -64,7 +123,7 @@ class Socks5Manager:
         if not self.is_stop():
             return
         else:
-            self.stop = False
+            self.stop_signal.clear()
 
         # ========= 配置socket =========
         # 创建socket类
@@ -100,7 +159,7 @@ class Socks5Manager:
         server: socket 是监听模式 listening listen()设置
         client: socket 是连接模式 established
         """
-        while not self.stop:
+        while not self.stop_signal.is_set():
             try:
                 # 阻塞
                 # 返回的是一条 tcp socket 字节流的通道，和来源信息
@@ -283,22 +342,28 @@ class Socks5Manager:
 
     def _communication( # 一条连接链
         self,
-        src_pipe: socket.socket,
-        tag_pipe: socket.socket,
+        src_pipe: socket.socket, # 发送通道
+        tag_pipe: socket.socket, # 接收通道
         context: dict | None,
     ):
-
+        # 每个会话都有专属的数据分析器
+        session = Session(
+            client_socket=src_pipe,
+            server_socket=tag_pipe,
+            context=context,
+            manager_stopped=self.stop_signal,
+        )
         data_packet_manager = get_data_packet_manager()
         sockets = [src_pipe, tag_pipe]
 
-        while not self.is_stop():
+        while not session.is_closed():
             # 有可读的内容socket立即返回， 有可写的socket立即返回， 有错误的socket立即返回
             # **有readable就是发生了事件，需要处理(触发); writeable只是判断这个socket是否已满还能不能写入数据(常驻)**
             readable, writeable, wrongs = select.select(
                 sockets, # 对应可读监控列表
                 [], # 对应可写监控列表，基本都不为空，忽略
                 sockets, # 对应错误的监控列表
-                1, # 等不到抉择时间
+                0.5, # 等不到抉择时间
             )
             # 有任何断裂就结束
             if wrongs:
@@ -312,31 +377,39 @@ class Socks5Manager:
                             logging.warning(f"[WARN] 游戏客户端与代理层断开连接")
                         elif sock is tag_pipe:
                             logging.warning(f"[WARN] 代理层与游戏服务器断开连接")
+                        session.close()
                         return
-                    else:
-                        if sock is src_pipe:
-                            direction = "game->server"
-                            aim = tag_pipe
-                        elif sock is tag_pipe:
-                            direction = "server->game"
-                            aim = src_pipe
-                        else:
-                            continue
 
-                        if data_packet_manager is not None: # 不是一次发送对应一个完整包，是一对n包括0
-                            data_packet_manager.parse_data(
-                                context=context,
-                                direction=direction,
-                                data=event_data,
-                                debug=self.debug,
-                            )
+                    action_packet_queue = []
 
-                        aim.sendall(event_data)
+                    if sock is src_pipe:
+                        original_direction = "game->server"
+                        action_packet_queue.append({
+                            "direction": original_direction,
+                            "data": event_data,
+                        })
+                    elif sock is tag_pipe:
+                        original_direction = "server->game"
+                        action_packet_queue.append({
+                            "direction": original_direction,
+                            "data": event_data,
+                        })
+
+                    if data_packet_manager is not None: # 不是一次发送对应一个完整包，是一对n包括0
+                        data_packets = data_packet_manager.parse_data(
+                            context=context,
+                            direction=original_direction,
+                            data=event_data,
+                            debug=self.debug,
+                        )
+
+                    for action in action_packet_queue:
+                        session.send(action["direction"], action["data"])
 
     def close(self):
         logging.info(f"[INFO] Socks5 监听服务正在停止...")
         # 退出所有循环
-        self.stop = True
+        self.stop_signal.set()
         # 删除所有已追踪通道并关闭
         with self.socket_lock:
             for pipe_client in self.pipe_clients:
@@ -392,7 +465,7 @@ class Socks5Manager:
 
         try:
             # SOCKS5规定：TCP控制连接存在期间，UDP关联才有效
-            while not self.stop:
+            while not self.stop_signal.is_set():
                 readable, _, _ = select.select(
                     [pipe_client],
                     [],

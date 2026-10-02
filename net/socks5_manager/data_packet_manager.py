@@ -3,6 +3,8 @@ from datetime import datetime
 from typing import Any
 from dataclasses import dataclass
 
+from utils import get_decrypt_manger
+
 logging.basicConfig(level=logging.INFO)
 
 @dataclass
@@ -32,6 +34,16 @@ class DataPacketManager:
             "server->game": bytearray(),
         }
 
+        self.decrypt_manager = get_decrypt_manger()
+        self.decrypt_ignore_command_id = [
+            65537,
+            327681,
+        ]
+
+    def build_action_packet(self, action_spec: dict):
+
+        pass
+
     def completed_data_stream(self, direction: str, data: bytes):
         """
         **一对n核心**
@@ -46,7 +58,11 @@ class DataPacketManager:
 
         while len(buffer) >= self.header_size: # 协议本身允许出现body长度为0的整包
             if buffer[:2] != self.magic:
-                raise Exception("失去同步")
+                raise Exception(f"失去同步"
+                                f"direction={direction}, "
+                                f"head={bytes(buffer[:32])!r}, "
+                                f"hex={bytes(buffer[:32]).hex(' ')}"
+                                )
             count = int.from_bytes(
                 buffer[2:4],
                 "big",
@@ -78,19 +94,23 @@ class DataPacketManager:
                     data=completed_data,
                 )
                 if debug:
-                    self._log_report(data_packet, [198935, 198936])
+                    self._log_report(data_packet,)
                 data_packets.append(data_packet)
-            # TODO 交给mod管理器中添加的mod方法路由处理，修改完后返回至转发
+            return data_packets
         except Exception as err:
             logging.warning(f"[WARN] {err}")
             return
 
     @staticmethod
-    def _log_report(data_pack: DataPack, aim_id=None):
+    def _log_report(data_pack: DataPack, aim_id=None, dismiss_id=None):
+        # 筛选
         if aim_id:
             if data_pack.command_id not in aim_id:
                 return
-
+        if dismiss_id:
+            if data_pack.command_id in dismiss_id:
+                return
+        # 日志展示
         print("*"*100)
         print(f"[EVENT] {data_pack.direction}")
         print(f"时间: {data_pack.time_stamp}")

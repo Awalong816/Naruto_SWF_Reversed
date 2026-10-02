@@ -1,7 +1,4 @@
 class NarutoServerDecryptManager:
-    def __init__(self):
-        pass
-
     def decrypt(self, data: bytes, device="latest", **kwargs):
         func_head = "_decrypt_naruto_server_swf_"
         if device == "latest":

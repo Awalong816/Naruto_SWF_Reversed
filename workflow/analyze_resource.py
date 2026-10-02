@@ -234,7 +234,7 @@ def analyze_from_server(cfg: Configs, client: NetClient):
         raise ValueError(f"主动请求服务器资源需要`zone_id`")
     try:
         zone_id = int(zone_id)
-    except ValueError as err:
+    except ValueError:
         raise ValueError(f"运行配置-`zone_id`无效")
     except Exception as err:
         raise Exception(f"`zone_id`意外错误: {err}")
