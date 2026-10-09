@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from .decrypt_game_server_swf import get_naruto_server_decrypt_manager
-from .game_data_crypt import get_game_data_crypt_manager
+from .crypt_game_data import get_game_data_crypt_manager
 
 class DecryptManager:
     def __init__(self):

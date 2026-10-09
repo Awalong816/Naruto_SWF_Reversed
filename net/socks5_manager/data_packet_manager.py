@@ -34,7 +34,7 @@ class DataPacketManager:
             "game->server": bytearray(),
             "server->game": bytearray(),
         }
-
+        # 外部组件
         self.decrypt_manager = get_decrypt_manger()
         self.decrypt_need_command_id = [
             198935,
@@ -113,7 +113,9 @@ class DataPacketManager:
                     is_decrypted=is_decrypted,
                 )
                 if debug:
-                    self._log_report(data_packet,)
+                    self._log_report(data_packet,
+                                     aim_id=[198935,198936],
+                                     )
                 data_packets.append(data_packet)
             return data_packets
         except Exception as err:
@@ -145,8 +147,10 @@ class DataPacketManager:
             print("未知")
         print(f"指令/动作 ID: {data_pack.command_id}")
         print(f"有效长度: {data_pack.count}")
-        print(f"内容部分原始字节流: {data_pack.value_data}")
-        print(f"内容部分原始字节HEX: {data_pack.value_data[:min(len(data_pack.value_data),256)].hex(' ')}")
+        if data_pack.is_decrypted:
+            print(f"已经过 TEA 解密")
+        print(f"原始字节流: {data_pack.value_data}")
+        print(f"原始字节HEX: {data_pack.value_data[:min(len(data_pack.value_data),256)].hex(' ')}")
         print("*"*100)
         print("\n")
 

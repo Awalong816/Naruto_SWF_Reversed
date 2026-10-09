@@ -33,9 +33,9 @@ class Session:
     )
 
     context: str | None
-    uin: str | None # 当前账号
-    role_id: str | None # 当前角色名
-    server_id: str | None # 当前区服
+    uin: str = None # 当前账号
+    role_id: str = None # 当前角色名
+    server_id: str = None # 当前区服
     client_ip: int = 0
     timeout: float = 0.0
     # TODO request_id在额外动作时使用高半区位置, 容易被反追踪暴露, 尝试是否可行:服务器是否检察相连的请求是否连号
