@@ -425,6 +425,7 @@ class Socks5Manager:
                             session.uin = data_packets[0].uin
                             session.role_id = data_packets[0].role_id
                             session.server_id = data_packets[0].server_id
+                        # TODO mod按需求分发层分发
 
                     for action in action_packet_queue:
                         session.send(action["direction"], action["data"])

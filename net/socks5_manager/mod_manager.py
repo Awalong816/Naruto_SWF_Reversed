@@ -3,6 +3,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from importlib import util as import_util
 
+from utils import get_type_reader_manager
+from net.socks5_manager.data_packet_manager import DataPack
+
 logging.basicConfig(level=logging.INFO)
 
 @dataclass
@@ -14,13 +17,17 @@ class Scene:
 @dataclass
 class Mod:
     mod_id: str
-    name: str
     scene: Scene
     enabled: bool
 
+
 class ModManager:
+    """
+    mod manager负责处理分发数据，获得触发事件、定时事件，不负责判断request_id
+    """
     def __init__(self, mods_path: str):
         self.mods_path = mods_path
+        self.type_reader = get_type_reader_manager()
 
     def list_mods(self):
         pass
@@ -66,6 +73,14 @@ class ModManager:
             "MOD_INFO",
             {}
         )
+
+    # 添加触发事件
+    def data_router(self, data_packets: list[DataPack]):
+        pass
+
+    # 添加定时事件
+    def timer_router(self):
+        pass
 
 
 def get_mod_manager(path: str):

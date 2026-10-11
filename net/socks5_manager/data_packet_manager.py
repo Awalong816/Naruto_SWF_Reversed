@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Any
 from dataclasses import dataclass
 
-from utils import get_decrypt_manger
+from utils import get_decrypt_manager
 
 logging.basicConfig(level=logging.INFO)
 
@@ -35,7 +35,7 @@ class DataPacketManager:
             "server->game": bytearray(),
         }
         # 外部组件
-        self.decrypt_manager = get_decrypt_manger()
+        self.decrypt_manager = get_decrypt_manager()
         self.decrypt_need_command_id = [
             198935,
             198936,

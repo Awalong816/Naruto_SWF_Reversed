@@ -15,7 +15,7 @@ if project_root not in sys.path:
 # 现在可以直接导入
 from config import Configs
 from net import NetClient
-from utils import get_decompress_manager, get_type_reader_manager, get_decrypt_manger
+from utils import get_decompress_manager, get_type_reader_manager, get_decrypt_manager
 
 # 筛选url二进制字节段
 # re.compile 包装成对象，使用search方法进行正则匹配
@@ -38,7 +38,7 @@ version_sign = re.compile(
 
 decompress_manager = get_decompress_manager()
 type_reader_manager = get_type_reader_manager()
-decrypt_manager = get_decrypt_manger()
+decrypt_manager = get_decrypt_manager()
 
 
 def url_tpf_test():
