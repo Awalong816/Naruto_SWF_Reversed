@@ -2,6 +2,8 @@ import os
 import json
 from pathlib import Path
 
+from net.socks5_manager.mod_manager import BaseMod
+
 
 MOD_INFO = {
     "id": "auto_rob_attack", # mod标识
