@@ -4,18 +4,6 @@ from pathlib import Path
 
 from net.socks5_manager.mod_manager import BaseMod
 
-
-MOD_INFO = {
-    "id": "auto_rob_attack", # mod标识
-    "name": "自动打劫脚本", # 前端展示名称
-    "fit": {
-        "direction": "server->game",
-        "command_id": 198935,
-        "time_slot": [("11:00", "14:30"),("18:00", "21:30")]
-    },
-    "data_type": "protobuf",
-}
-
 # =============================================================================
 
 RET_INFO_SCHEMA = {
@@ -184,10 +172,23 @@ SS_TASK_IDS = {
 # =============================================================================
 
 
-class AutoRobAttackMod:
+class AutoRobAttackMod(BaseMod):
     def __init__(self):
+        # 继承成员
+        self.MOD_INFO = {
+            "id": "auto_rob_attack", # mod标识
+            "name": "自动打劫脚本", # 前端展示名称
+            "fit": {
+                "direction": "server->game",
+                "command_id": 198935,
+                "time_slot": [("11:00", "14:30"),("18:00", "21:30")]
+            },
+            "data_type": "protobuf",
+        }
+        # 自我成员
         self.attack_list = []
 
+    # ============= 自我方法 =============
     @staticmethod
     def _zigzag_decode(value: int) -> int:
         """Protobuf sint32/sint64 转有符号整数"""
@@ -302,6 +303,7 @@ class AutoRobAttackMod:
             "content": "",
         }
 
+    # ============= 继承方法 =============
     def enabled_init(self):
         return [self.send_198935_action()]
 
