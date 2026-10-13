@@ -9,16 +9,35 @@ from net.socks5_manager.data_packet_manager import DataPack
 logging.basicConfig(level=logging.INFO)
 
 @dataclass
-class Scene:
-    direction: str
-    command_id: int
-    time_slot: list[tuple]
+class BaseMod:
+    MOD_INFO: dict
+    enabled: bool = False
 
-@dataclass
-class Mod:
-    mod_id: str
-    scene: Scene
-    enabled: bool
+    def enable_init(self):
+        """
+        mod在启用时开始需要发送的动作，可以为空
+        :return:
+        """
+        ...
+
+    def is_enabled(self):
+        """
+        状态机函数
+        :return:
+        """
+        ...
+
+    def event_trigger(self, data_packet: bytes):
+        ...
+
+    def timer_trigger(self):
+        ...
+
+    def start(self):
+        ...
+
+    def stop(self):
+        ...
 
 
 class ModManager:
