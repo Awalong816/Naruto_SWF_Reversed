@@ -39,7 +39,7 @@ class Session:
     client_ip: int = 0
     timeout: float = 0.0
     # TODO request_id在额外动作时使用高半区位置, 容易被反追踪暴露, 尝试是否可行:服务器是否检察相连的请求是否连号
-    extra_action_request_id: int = 0x80000000
+    extra_action_request_id: int = 0x80000000 # 每个会话额外任务id与其他会话隔离
     extra_action_request_id_range: tuple = (0x80000000, 0xFFFFFFFF)
 
     closed: th.Event = field(

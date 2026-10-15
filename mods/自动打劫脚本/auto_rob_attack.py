@@ -1,8 +1,21 @@
 import os
 import json
+import time
 from pathlib import Path
 
 from net.socks5_manager.mod_manager import BaseMod
+
+# 模组信息提到类顶方便提取
+MOD_INFO = {
+    "id": "auto_rob_attack", # mod标识
+    "name": "自动打劫脚本", # 前端展示名称
+    "fit": {
+        "direction": "server->game",
+        "command_id": 198935,
+        "time_slot": [("11:00", "14:30"),("18:00", "21:30")]
+    },
+    "data_type": "protobuf",
+}
 
 # =============================================================================
 
@@ -175,16 +188,7 @@ SS_TASK_IDS = {
 class AutoRobAttackMod(BaseMod):
     def __init__(self):
         # 继承成员
-        self.MOD_INFO = {
-            "id": "auto_rob_attack", # mod标识
-            "name": "自动打劫脚本", # 前端展示名称
-            "fit": {
-                "direction": "server->game",
-                "command_id": 198935,
-                "time_slot": [("11:00", "14:30"),("18:00", "21:30")]
-            },
-            "data_type": "protobuf",
-        }
+        self.MOD_INFO = MOD_INFO
         # 自我成员
         self.attack_list = []
 
@@ -306,6 +310,9 @@ class AutoRobAttackMod(BaseMod):
     # ============= 继承方法 =============
     def enabled_init(self):
         return [self.send_198935_action()]
+
+
+SERVER_MOD_CLASS = AutoRobAttackMod
 
 
 if __name__ == "__main__":
