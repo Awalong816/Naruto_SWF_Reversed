@@ -33,9 +33,11 @@ class Session:
     )
 
     context: str | None
-    uin: str = None # 当前账号
-    role_id: str = None # 当前角色名
-    server_id: str = None # 当前区服
+    uin: str = None # 当前登录的QQ账号
+    role_id: str = None # 当前角色名，本人恒为0
+    server_id: int = None # 当前区服
+    session_id: str = None # 会话标识
+
     client_ip: int = 0
     timeout: float = 0.0
     # TODO request_id在额外动作时使用高半区位置, 容易被反追踪暴露, 尝试是否可行:服务器是否检察相连的请求是否连号
@@ -47,6 +49,19 @@ class Session:
         init=False,
         repr=False,
     )
+
+    def bind_session_id(self):
+        try:
+            if self.uin is not None and self.server_id is not None:
+                sid = str(self.server_id)
+                if len(sid) == 4 and sid.startswith("6"):
+                    server_sign = f"联盟{sid[1:]}"
+                else:
+                    server_sign = self.server_id
+
+                self.session_id = str(server_sign) + "区-QQ<" + str(self.uin)+">"
+        except TypeError as err:
+            raise TypeError(f"区号: {self.server_id} 绑定出错: {err}")
 
     def is_closed(self):
         result = self.closed.is_set() or self.manager_stopped.is_set()
@@ -414,6 +429,9 @@ class Socks5Manager:
                         continue
 
                     if data_packet_manager is not None: # 不是一次发送对应一个完整包，是一对n包括0
+                        if session.session_id is not None:
+                            context["session_id"] = session.session_id
+
                         data_packets = data_packet_manager.parse_data(
                             context=context,
                             direction=original_direction,
@@ -422,9 +440,12 @@ class Socks5Manager:
                         )
                         # 首次打通将头部固定不变的内容写入会话属性
                         if data_packets and len(data_packets) > 0:
-                            session.uin = data_packets[0].uin
-                            session.role_id = data_packets[0].role_id
-                            session.server_id = data_packets[0].server_id
+                            if not session.session_id:
+                                session.uin = data_packets[0].uin
+                                session.role_id = data_packets[0].role_id
+                                session.server_id = data_packets[0].server_id
+                                session.bind_session_id()
+                                print(f"session_id: {session.session_id}")
                         # TODO mod按需求分发层分发
 
                     for action in action_packet_queue:

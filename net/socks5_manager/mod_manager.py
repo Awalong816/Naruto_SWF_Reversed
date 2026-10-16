@@ -63,7 +63,7 @@ class ModManager:
         # 组件
         self.type_reader = get_type_reader_manager()
 
-    def list_mods(self):
+    def list_mods(self, session_id):
         pass
 
     def load_mods(self):
