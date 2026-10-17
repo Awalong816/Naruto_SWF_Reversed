@@ -186,10 +186,14 @@ SS_TASK_IDS = {
 
 
 class AutoRobAttackMod(BaseMod):
+    MOD_INFO = MOD_INFO
+
     def __init__(self):
         # 继承成员
-        self.MOD_INFO = MOD_INFO
-        # 自我成员
+        # 自带:
+        # enabled = false
+        super().__init__()
+        # 自带成员
         self.attack_list = []
 
     # ============= 自我方法 =============

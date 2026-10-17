@@ -1,4 +1,5 @@
 import logging
+import threading as th
 from dataclasses import dataclass
 from pathlib import Path
 from importlib import util as import_util
@@ -9,11 +10,14 @@ from net.socks5_manager.data_packet_manager import DataPack
 logging.basicConfig(level=logging.INFO)
 
 class BaseMod:
+    # 静态
+    MOD_INFO: dict = {}
+
     def __init__(self):
-        self.MOD_INFO: dict
+        # 可变
         self.enabled: bool = False
 
-    def enable_init(self):
+    def enabled_init(self):
         """
         mod在启用时开始需要发送的动作，可以为空
         :return:
@@ -48,6 +52,13 @@ class BaseMod:
     def stop(self):
         ...
 
+# 每个模型的运行状态
+class ModRunTime:
+    def __init__(self, mod: BaseMod):
+        self.mod_name = mod.MOD_INFO["name"]
+        self.mod_id = mod.MOD_INFO["id"]
+        self.enabled = mod.enabled
+
 
 class ModManager:
     """
@@ -56,17 +67,16 @@ class ModManager:
     def __init__(self, mods_path: str):
         self.mods_path = mods_path
 
+        self.mod_lock = th.Lock()
+
         self.mods_lib = {} # 静态注册，保留mod的所有信息
-        self.session_event_trigger = {} # 每个会话独立的事件触发状态机 {session_id: {接受条件: 触发函数}}
-        self.session_timer_trigger = {} # 每个会话独立的定时任务状态机 {session_id: ...}
+        self.session_mods_state = {}
 
         # 组件
         self.type_reader = get_type_reader_manager()
 
-    def list_mods(self, session_id):
-        pass
-
-    def load_mods(self):
+    # 注册保存mod
+    def log_in_mods(self):
         mods_dir = Path(self.mods_path)
 
         mods_dir.mkdir(
@@ -79,12 +89,12 @@ class ModManager:
                 logging.info(f"[INFO] 正在静态注册Mod <{mod_pack.stem}> 信息...")
                 for mod_file in mod_pack.glob("*.py"):
                     try:
-                        self._load(mod_file)
+                        self._log_in(mod_file)
                         logging.info(f"[INFO] 静态注册Mod <{mod_pack.stem}> 信息成功")
                     except Exception as err:
                         logging.warning(f"[WARN] 静态注册Mod <{mod_file.stem}> 失败: {err}")
 
-    def _load(self, mod_file: Path):
+    def _log_in(self, mod_file: Path):
         """
         自主实现import
         模块的配置(名字，位置)，组装完后直接进入全局引用字典sys.modules，不需要额外导入
@@ -131,12 +141,8 @@ class ModManager:
         if mod_id not in self.mods_lib.keys():
             self.mods_lib[mod_id] = mod_cls
 
-    # 添加触发事件
-    def data_router(self, data_packets: list[DataPack]):
-        pass
-
-    # 添加定时事件
-    def timer_router(self):
+    def log_in_session(self, session_id):
+        # TODO 在mod事件触发和定时触发表里注册静态mod列表的所有方法，并提供可开关的前端接口
         pass
 
 
@@ -148,6 +154,6 @@ if __name__ == "__main__":
     mods_dir_path = r"../../mods"
 
     mod_manager = get_mod_manager(mods_dir_path)
-    mod_manager.load_mods()
+    mod_manager.log_in_mods()
 
 
