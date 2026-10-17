@@ -99,6 +99,7 @@ class Socks5Manager:
             self,
             host: str,
             port: int,
+            max_service: int,
             max_input: int,
             t_host_domain: str | list[str] = None,
             mods_path: str = None,
@@ -126,12 +127,14 @@ class Socks5Manager:
         # 句柄
         self.socket_handle = None # socket句柄
         self.socket_thread_handle = None # 运行socket循环的线程的句柄
-        # 子项
+        # 管理子项
         self.socket_lock = th.Lock() # 线程锁
+        self.session_lock = th.Lock() # 会话锁
         self.pipe_clients = set() # 自动快速去重
-
-        # 传递给gui的事件
-        self.max_input_queue = max_input
+        self.having_sessions = {} # 管理的会话
+        # 限制
+        self.max_service_session = max_service # 最多同时服务的会话
+        self.max_wait_queue = max_input # listen的最大等待队伍长度
 
     def is_stop(self):
         return self.stop_signal.is_set()
@@ -165,7 +168,7 @@ class Socks5Manager:
         )
         server.bind((self.server_host, self.server_port))  # socket绑定
         # 循环accept()会阻塞等待到读取tcp
-        server.listen(self.max_input_queue)  # 设置最长等待队列，后面请求的会被拒绝 性质：建立好的通道数，在连接之后负责通信，本体基本不变化，所以上限值不大
+        server.listen(self.max_wait_queue)  # 设置最长等待队列，后面请求的会被拒绝 性质：建立好的通道数，在连接之后负责通信，本体基本不变化，所以上限值不大
         server.settimeout(1)  # 防止循环卡死 读取不到tcp也可以回到循环开头判断服务是不是还在进行，否则无法关闭循环
         # ========= 配置完成，放入线程运行 =========
         self.socket_handle = server
@@ -364,6 +367,27 @@ class Socks5Manager:
         except OSError:
             pass
 
+    def _log_in_session(self, session_id, body: Session):
+        with self.session_lock:
+            if len(self.having_sessions) < self.max_service_session:
+                if session_id not in self.having_sessions.keys():
+                    self.having_sessions[session_id] = body
+                    # TODO 通知前端session新增一行
+                    # TODO 通知mod管理器添加这个session_id的状态机
+                else:
+                    raise ValueError(f"已存在同名会话")
+            else:
+                raise Exception(f"同时服务的会话达到上限")
+
+    def _log_off_session(self, session_id, body: Session):
+        if not session_id:
+            return
+        with self.session_lock:
+            if self.having_sessions.get(session_id) is body:  # 只删自己那条
+                self.having_sessions.pop(session_id, None)  # 默认值，绝不 KeyError
+            # TODO 通知前端删除session这一行
+            # TODO 通知mod管理器删除这个session和其状态机
+
     def _communication( # 一条连接链
         self,
         src_pipe: socket.socket, # 发送通道
@@ -387,69 +411,82 @@ class Socks5Manager:
         data_packet_manager = get_data_packet_manager()
         sockets = [src_pipe, tag_pipe]
 
-        while not session.is_closed():
-            # 有可读的内容socket立即返回， 有可写的socket立即返回， 有错误的socket立即返回
-            # **有readable就是发生了事件，需要处理(触发); writeable只是判断这个socket是否已满还能不能写入数据(常驻)**
-            readable, writeable, wrongs = select.select(
-                sockets, # 对应可读监控列表
-                [], # 对应可写监控列表，基本都不为空，忽略
-                sockets, # 对应错误的监控列表
-                0.5, # 等不到抉择时间
-            )
-            # 有任何断裂就结束
-            if wrongs:
-                return
+        try:
+            while not session.is_closed():
+                # 有可读的内容socket立即返回， 有可写的socket立即返回， 有错误的socket立即返回
+                # **有readable就是发生了事件，需要处理(触发); writeable只是判断这个socket是否已满还能不能写入数据(常驻)**
+                readable, writeable, wrongs = select.select(
+                    sockets,  # 对应可读监控列表
+                    [],  # 对应可写监控列表，基本都不为空，忽略
+                    sockets,  # 对应错误的监控列表
+                    0.5,  # 等不到抉择时间
+                )
+                # 有任何断裂就结束
+                if wrongs:
+                    return
 
-            if readable: # 触发了事件后
-                for sock in readable:
-                    event_data = sock.recv(65536) # 触发了事件后，不完整没关系，本身有可能是分块的
-                    if not event_data: # 得到空等于一段关闭了连接，正常一直阻塞
+                if readable:  # 触发了事件后
+                    for sock in readable:
+                        event_data = sock.recv(65536)  # 触发了事件后，不完整没关系，本身有可能是分块的
+                        if not event_data:  # 得到空等于一段关闭了连接，正常一直阻塞
+                            if sock is src_pipe:
+                                logging.warning(f"[WARN] 游戏客户端与代理层断开连接")
+                            elif sock is tag_pipe:
+                                logging.warning(f"[WARN] 代理层与游戏服务器断开连接")
+                            session.close()
+                            return
+
+                        action_packet_queue = []
+
                         if sock is src_pipe:
-                            logging.warning(f"[WARN] 游戏客户端与代理层断开连接")
+                            original_direction = "game->server"
+                            action_packet_queue.append({
+                                "direction": original_direction,
+                                "data": event_data,
+                            })
                         elif sock is tag_pipe:
-                            logging.warning(f"[WARN] 代理层与游戏服务器断开连接")
-                        session.close()
-                        return
+                            original_direction = "server->game"
+                            action_packet_queue.append({
+                                "direction": original_direction,
+                                "data": event_data,
+                            })
+                        else:
+                            continue
 
-                    action_packet_queue = []
+                        if data_packet_manager is not None:  # 不是一次发送对应一个完整包，是一对n包括0
+                            if session.session_id is not None:
+                                context["session_id"] = session.session_id
 
-                    if sock is src_pipe:
-                        original_direction = "game->server"
-                        action_packet_queue.append({
-                            "direction": original_direction,
-                            "data": event_data,
-                        })
-                    elif sock is tag_pipe:
-                        original_direction = "server->game"
-                        action_packet_queue.append({
-                            "direction": original_direction,
-                            "data": event_data,
-                        })
-                    else:
-                        continue
+                            data_packets = data_packet_manager.parse_data(
+                                context=context,
+                                direction=original_direction,
+                                data=event_data,
+                                debug=self.debug,
+                            )
+                            # 首次打通将头部固定不变的内容写入会话属性
+                            if data_packets and len(data_packets) > 0:
+                                if not session.session_id:
+                                    session.uin = data_packets[0].uin
+                                    session.role_id = data_packets[0].role_id
+                                    session.server_id = data_packets[0].server_id
+                                    session.bind_session_id()
+                                    try:
+                                        self._log_in_session(session.session_id, session)
+                                        logging.info(f"会话 {session.session_id} 已成功注册")
+                                    except Exception as err:
+                                        logging.warning(f"添加新会话失败: {err}")
+                                        return
+                            # TODO mod按需求分发层分发
 
-                    if data_packet_manager is not None: # 不是一次发送对应一个完整包，是一对n包括0
-                        if session.session_id is not None:
-                            context["session_id"] = session.session_id
+                        for action in action_packet_queue:
+                            session.send(action["direction"], action["data"])
 
-                        data_packets = data_packet_manager.parse_data(
-                            context=context,
-                            direction=original_direction,
-                            data=event_data,
-                            debug=self.debug,
-                        )
-                        # 首次打通将头部固定不变的内容写入会话属性
-                        if data_packets and len(data_packets) > 0:
-                            if not session.session_id:
-                                session.uin = data_packets[0].uin
-                                session.role_id = data_packets[0].role_id
-                                session.server_id = data_packets[0].server_id
-                                session.bind_session_id()
-                                print(f"session_id: {session.session_id}")
-                        # TODO mod按需求分发层分发
-
-                    for action in action_packet_queue:
-                        session.send(action["direction"], action["data"])
+        finally:
+            self._log_off_session(session.session_id, session)
+            logging.info(f"会话 {session.session_id} 已成功注销")
+            if self.debug:
+                logging.info(f"当前会话状态:\n{self.having_sessions}")
+            session.close()
 
     def close(self):
         logging.info(f"[INFO] Socks5 监听服务正在停止...")
@@ -528,6 +565,7 @@ class Socks5Manager:
 def get_socks_manager(cfg: Configs):
     host = cfg.net_proxy_host or "127.0.0.1"
     port = int(cfg.net_proxy_prot or 19080)
+    max_service_sessions = int(cfg.net_proxy_max_service_sessions or 8)
     max_input_events = int(cfg.net_proxy_max_input_queue)
     mods_path = cfg.mods_path
     debug = cfg.debug
@@ -535,6 +573,7 @@ def get_socks_manager(cfg: Configs):
     return Socks5Manager(
         host=host,
         port=port,
+        max_service=max_service_sessions,
         max_input=max_input_events,
         t_host_domain=cfg.send_server_domain,
         mods_path=mods_path,
