@@ -108,7 +108,7 @@ class ModManager:
                         self._log_in_mod(mod_file)
                         logging.info(f"  注册Mod <{mod_pack.stem}> 依赖成功")
                     except Exception as err:
-                        logging.warning(f"   注册Mod <{mod_file.stem}> 依赖失败: {err}")
+                        logging.warning(f"  注册Mod <{mod_file.stem}> 依赖失败: {err}")
 
     def _log_in_mod(self, mod_file: Path):
         """
