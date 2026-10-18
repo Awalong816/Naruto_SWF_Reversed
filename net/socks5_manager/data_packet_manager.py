@@ -146,6 +146,7 @@ class DataPacketManager:
         else:
             print("未知")
         print(f"指令/动作 ID: {data_pack.command_id}")
+        print(f"请求 ID: {data_pack.request_id}")
         print(f"有效长度: {data_pack.count}")
         if data_pack.is_decrypted:
             print(f"已经过 TEA 解密")
