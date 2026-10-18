@@ -9,12 +9,14 @@ from net.socks5_manager.mod_manager import BaseMod
 MOD_INFO = {
     "id": "auto_rob_attack", # mod标识
     "name": "自动打劫脚本", # 前端展示名称
-    "fit": {
-        "direction": "server->game",
-        "command_id": 198935,
-        "time_slot": [("11:00", "14:30"),("18:00", "21:30")]
-    },
-    "data_type": "protobuf",
+    "fit": [
+        {
+            "direction": "server->game",
+            "command_id": 198935,
+            "time_slot": [("11:00", "14:30"),("18:00", "21:30")],
+            "data_type": "protobuf",
+        },
+    ]
 }
 
 # =============================================================================

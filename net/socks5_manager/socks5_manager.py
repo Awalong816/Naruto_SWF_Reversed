@@ -115,6 +115,7 @@ class Socks5Manager:
         # 组件
         # # mod
         self.mods_manager = get_mod_manager(mods_path)
+        self.mods_manager.log_in_mods()
 
         # 前序分析可能ip，作为白名单
         if type(t_host_domain) is str:
@@ -373,7 +374,7 @@ class Socks5Manager:
                 if session_id not in self.having_sessions.keys():
                     self.having_sessions[session_id] = body
                     # TODO 通知前端session新增一行
-                    # TODO 通知mod管理器添加这个session_id的状态机
+                    self.mods_manager.log_in_session(session_id)
                 else:
                     raise ValueError(f"已存在同名会话")
             else:
@@ -385,8 +386,8 @@ class Socks5Manager:
         with self.session_lock:
             if self.having_sessions.get(session_id) is body:  # 只删自己那条
                 self.having_sessions.pop(session_id, None)  # 默认值，绝不 KeyError
-            # TODO 通知前端删除session这一行
-            # TODO 通知mod管理器删除这个session和其状态机
+                # TODO 通知前端删除session这一行
+                self.mods_manager.log_off_session(session_id)
 
     def _communication( # 一条连接链
         self,
@@ -485,7 +486,7 @@ class Socks5Manager:
             self._log_off_session(session.session_id, session)
             logging.info(f"会话 {session.session_id} 已成功注销")
             if self.debug:
-                logging.info(f"当前会话状态:\n{self.having_sessions}")
+                logging.info(f"当前所有会话状态:\n{self.having_sessions}")
             session.close()
 
     def close(self):

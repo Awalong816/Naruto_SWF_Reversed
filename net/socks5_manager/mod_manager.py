@@ -1,4 +1,6 @@
 import logging
+import queue
+import json
 import threading as th
 from dataclasses import dataclass
 from pathlib import Path
@@ -52,12 +54,25 @@ class BaseMod:
     def stop(self):
         ...
 
+
 # 每个模型的运行状态
 class ModRunTime:
     def __init__(self, mod: BaseMod):
-        self.mod_name = mod.MOD_INFO["name"]
-        self.mod_id = mod.MOD_INFO["id"]
-        self.enabled = mod.enabled
+        # 本体
+        self.instance = mod
+        # 运行日志
+        self.running_log = []
+
+    # 状态取每一刻的同步状态=指针，否则加入类成员就是某一时刻的静止快照
+    def is_enabled(self):
+        return self.instance.enabled
+
+    def start(self):
+        self.instance.enabled = True
+        return self.instance.enabled_init() # 传递初始化事件
+
+    def stop(self):
+        self.instance.enabled = False
 
 
 class ModManager:
@@ -70,7 +85,8 @@ class ModManager:
         self.mod_lock = th.Lock()
 
         self.mods_lib = {} # 静态注册，保留mod的所有信息
-        self.session_mods_state = {}
+        self.session_mods_state: dict[str, dict[str, ModRunTime]] = {}
+        self.session_extra_queue: dict[str, queue.Queue] = {} # 额外动作队列字典，因为不是所有动作都由已知session_id的data_packet发送，比如enabled_init,定时触发事件
 
         # 组件
         self.type_reader = get_type_reader_manager()
@@ -84,17 +100,17 @@ class ModManager:
             exist_ok=True,  # 目录已存在时不报错
         )
 
+        logging.info(f"[INFO] 开始注册mod依赖...")
         for mod_pack in mods_dir.iterdir():
             if mod_pack.is_dir():
-                logging.info(f"[INFO] 正在静态注册Mod <{mod_pack.stem}> 信息...")
                 for mod_file in mod_pack.glob("*.py"):
                     try:
-                        self._log_in(mod_file)
-                        logging.info(f"[INFO] 静态注册Mod <{mod_pack.stem}> 信息成功")
+                        self._log_in_mod(mod_file)
+                        logging.info(f"[INFO]   注册Mod <{mod_pack.stem}> 依赖成功")
                     except Exception as err:
-                        logging.warning(f"[WARN] 静态注册Mod <{mod_file.stem}> 失败: {err}")
+                        logging.warning(f"[WARN]    注册Mod <{mod_file.stem}> 依赖失败: {err}")
 
-    def _log_in(self, mod_file: Path):
+    def _log_in_mod(self, mod_file: Path):
         """
         自主实现import
         模块的配置(名字，位置)，组装完后直接进入全局引用字典sys.modules，不需要额外导入
@@ -142,7 +158,41 @@ class ModManager:
             self.mods_lib[mod_id] = mod_cls
 
     def log_in_session(self, session_id):
-        # TODO 在mod事件触发和定时触发表里注册静态mod列表的所有方法，并提供可开关的前端接口
+        with self.mod_lock:
+            if session_id not in self.session_mods_state:
+                id_runtimes = {}
+                for mod_id, mod_cls in self.mods_lib.items():
+                    instance = mod_cls()
+                    try:
+                        id_runtimes[mod_id] = ModRunTime(mod=instance)
+                    except Exception as err:
+                        logging.warning(f"会话 {session_id} 添加mod实例失败: {err}")
+                # 先构造好，再一次性登记，消除空表窗口
+                self.session_mods_state[session_id] = id_runtimes
+                self.session_extra_queue[session_id] = queue.Queue()
+                logging.info(f"会话 {session_id} 添加mod完成")
+                print(f"会话 {session_id} 状态机:\n{self.session_mods_state}")
+
+    def log_off_session(self, session_id):
+        with self.mod_lock:
+            runtimes = self.session_mods_state.pop(session_id, None)  # 先摘表
+            self.session_extra_queue.pop(session_id, None)  # 先摘队
+        if runtimes is None:
+            logging.warning(f"没有找到会话 {session_id} 注册mod状态机")
+            return
+        for mod_id, mod_runtime in runtimes.items():  # 锁外停
+            try:
+                mod_runtime.stop()
+            except Exception as err:
+                logging.warning(f"会话 {session_id} 关闭mod {mod_id} 失败: {err}")
+
+    def start_mod_in_session(self, session_id, mod_id):
+        """
+        留给前端的接口
+        :param session_id:
+        :param mod_id:
+        :return:
+        """
         pass
 
 
