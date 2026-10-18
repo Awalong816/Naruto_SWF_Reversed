@@ -195,6 +195,12 @@ class ModManager:
         """
         pass
 
+    def event_trigger(self, session_id, data_packets: DataPack):
+        pass
+
+    def timer_trigger(self, session_id):
+        pass
+
 
 def get_mod_manager(path: str):
     return ModManager(path)
