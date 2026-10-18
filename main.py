@@ -104,7 +104,7 @@ if __name__ == "__main__":
 
     # 鉴权
     if not is_admin(global_config.debug):
-        logging.error(f"[ERROR] 鉴权失败, 使用管理员身份重新打开")
+        logging.error(f"鉴权失败, 使用管理员身份重新打开")
         exit(1)
 
     # ======= 1.1 先主动获取资源和服务器信息 =======
@@ -112,15 +112,15 @@ if __name__ == "__main__":
         resource_requirement = analyze_from_server(global_config, global_net_client)
     except Exception as err:
         # 1.2 失败后从本地获取
-        logging.warning(f"[WARN] {err}\n转为本地缓存文件获取...")
+        logging.warning(f"{err}\n转为本地缓存文件获取...")
         # 获取游戏本体本地目录
         try:
             essence_dir = get_qqgamebox_client_path()
         except NotADirectoryError as err:
-            logging.error(f"[ERROR] {err}")
+            logging.error(f"{err}")
             exit(1)
         except Exception as err:
-            logging.error(f"[ERROR] 获取游戏目录路径失败: {err}")
+            logging.error(f"获取游戏目录路径失败: {err}")
             exit(1)
 
         # 分析本地tbs缓存得到前置资源
@@ -128,7 +128,7 @@ if __name__ == "__main__":
             tbs_cache_path = os.path.join(essence_dir, "tbs_cache")
             resource_requirement_font = analyze_tbs_cache_front(tbs_cache_path, global_config)
         except Exception as err:
-            logging.error(f"[ERROR] 获取前置资源url表单失败: {err}")
+            logging.error(f"获取前置资源url表单失败: {err}")
             exit(1)
 
         # ======= 项目更新用 ========
@@ -136,9 +136,9 @@ if __name__ == "__main__":
         # 下载前置资源
         # try:
         #     global_net_client.download_requirement(resource_requirement_font, global_config.resource_save_path)
-        #     logging.info(f"[INFO] 前置资源获取成功, 保存目录: {global_config.resource_save_path}")
+        #     logging.info(f"前置资源获取成功, 保存目录: {global_config.resource_save_path}")
         # except Exception as err:
-        #     logging.error(f"[ERROR] 获取前置资源文件失败: {err}")
+        #     logging.error(f"获取前置资源文件失败: {err}")
         #     exit(1)
 
         #  处理后置资源
@@ -149,53 +149,53 @@ if __name__ == "__main__":
         # try:
         #     resource_requirement_after = next(gen)
         # except StopIteration:
-        #     logging.error("[ERROR] 生成器没有返回资源需求")
+        #     logging.error("生成器没有返回资源需求")
         #     exit(1)
         # except Exception as err:
-        #     logging.error(f"[ERROR] 后置资源处理错误: {err}")
+        #     logging.error(f"后置资源处理错误: {err}")
         #     exit(1)
 
         #  ✅ 下载后置资源
         # try:
         #     global_net_client.download_requirement(resource_requirement_after, global_config.resource_save_path)
-        #     logging.info(f"[INFO] 后置资源下载成功")
+        #     logging.info(f"后置资源下载成功")
         # except Exception as err:
-        #     logging.error(f"[ERROR] 获取后置资源文件失败: {err}")
+        #     logging.error(f"获取后置资源文件失败: {err}")
         #     exit(1)
         #
         #  ✅ 第二次 next() → 继续执行 part2（解密）
         # try:
         #     next(gen)
-        #     logging.info("[INFO] 解密完成")
+        #     logging.info("解密完成")
         # except StopIteration:
         #     # 生成器正常结束
         #     pass
         # except Exception as err:
-        #     logging.error(f"[ERROR] 解密失败: {err}")
+        #     logging.error(f"解密失败: {err}")
         #     exit(1)
         #
         # resource_requirement = resource_requirement_font | resource_requirement_after
 
     # 最后检查
     if global_config.send_server_domain and global_config.send_server_prot >= 0:
-        logging.info(f"[INFO] 找到游戏服务器域名: {global_config.send_server_domain}")
-        logging.info(f"[INFO] 找到游戏服务器接收端口: {global_config.send_server_prot}")
+        logging.info(f"找到游戏服务器域名: {global_config.send_server_domain}")
+        logging.info(f"找到游戏服务器接收端口: {global_config.send_server_prot}")
     else:
-        logging.error(f"[ERROR] 前置条件缺失,无法继续运行")
+        logging.error(f"前置条件缺失,无法继续运行")
         exit(1)
 
     # ======= 2.开始代理 ========
     try:
         proxy_start(global_config, global_net_client)
     except Exception as err:
-        logging.error(f"[ERROR] 启动本地代理失败: {err}")
+        logging.error(f"启动本地代理失败: {err}")
         exit(1)
 
     # 阻塞
     input(f"无UI阻塞,输入任意退出:")
 
     # ======= 退出清理 ========
-    logging.info(f"[INFO] 退出清理: net_client...")
+    logging.info(f"退出清理: net_client...")
     global_net_client.close()
 
 

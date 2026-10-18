@@ -58,7 +58,7 @@ class NetClient:
                 file_path.write_bytes(file_data)
 
             except Exception as err:
-                logging.warning(f"[WARN] {err}")
+                logging.warning(f"{err}")
                 continue
 
     def rig_socks5_manager(self, cfg: Configs):

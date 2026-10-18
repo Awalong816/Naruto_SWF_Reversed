@@ -33,11 +33,11 @@ class ProxyManager:
                     errors='ignore'
                 )
                 if result.returncode != 0:
-                    logging.warning("[WARN] proxy-bridge 未安装")
+                    logging.warning("proxy-bridge 未安装")
                     install_ans = input("是否由工作流自动安装`proxy-bridge`?(y/n):")
                     # print(type(install_ans))
                     if install_ans.lower() == "y":
-                        logging.info("[INFO] 开始自动安装 proxy-bridge...")
+                        logging.info("开始自动安装 proxy-bridge...")
                         result = sub.run(
                             [
                                 'winget', 'install',
@@ -54,14 +54,14 @@ class ProxyManager:
                             errors='ignore'
                         )
                         if result.returncode == 0 and result.stdout:
-                            logging.info("[INFO] proxy-bridge 安装成功")
+                            logging.info("proxy-bridge 安装成功")
                         else:
-                            logging.error(f"[ERROR] proxy-bridge 安装失败: {result.stderr}")
+                            logging.error(f"proxy-bridge 安装失败: {result.stderr}")
                             return False
                     else:
                         return False
                 elif result.returncode == 0 and result.stdout:
-                    logging.info("[INFO] proxy-bridge 已安装")
+                    logging.info("proxy-bridge 已安装")
 
                 possible_paths = [
                     shutil.which("ProxyBridge_CLI.exe"),
@@ -79,18 +79,18 @@ class ProxyManager:
 
                 if cli_path is None:
                     logging.warning(
-                        "[WARN] 找不到ProxyBridge_CLI.exe"
+                        "找不到ProxyBridge_CLI.exe"
                     )
                     return False
             except Exception as err:
-                logging.error(f"[ERROR] proxy-bridge 检查失败: {err}")
+                logging.error(f"proxy-bridge 检查失败: {err}")
                 return False
             # 检查可用性
             core_path = cli_path.parent / "ProxyBridgeCore.dll"
 
             if not core_path.is_file():
                 logging.warning(
-                    f"[WARN] 缺少ProxyBridgeCore.dll: {core_path}"
+                    f"缺少ProxyBridgeCore.dll: {core_path}"
                 )
                 return False
 
@@ -104,13 +104,13 @@ class ProxyManager:
                 )
             except Exception as err:
                 logging.error(
-                    f"[ERROR] ProxyBridge启动检查失败: {err}"
+                    f"ProxyBridge启动检查失败: {err}"
                 )
                 return False
 
             if result.returncode != 0:
                 logging.error(
-                    f"[ERROR] ProxyBridge运行异常:\n"
+                    f"ProxyBridge运行异常:\n"
                     f"{result.stdout}\n{result.stderr}"
                 )
                 return False
@@ -120,7 +120,7 @@ class ProxyManager:
             version = result.stdout.strip() or "版本未知"
 
             logging.info(
-                f"\n[INFO] ProxyBridge依赖正常\n"
+                f"\nProxyBridge依赖正常\n"
                 f"路径: {cli_path}\n"
                 f"版本: \n{version}\n"
             )
@@ -136,15 +136,15 @@ class ProxyManager:
                 ]
                 for app_path in app_paths:
                     if app_path.exists():
-                        logging.info(f"[INFO] proxy-bridge 已安装")
+                        logging.info(f"proxy-bridge 已安装")
                         return True
-                logging.warning(f"[WARN] 暂不提供mac系统自动下载, 需要手动安装 proxy-bridge")
-                logging.error(f"[ERROR] proxy-bridge 未安装")
+                logging.warning(f"暂不提供mac系统自动下载, 需要手动安装 proxy-bridge")
+                logging.error(f"proxy-bridge 未安装")
             except Exception as err:
-                logging.error(f"[ERROR] proxy-bridge 检查失败: {err}")
+                logging.error(f"proxy-bridge 检查失败: {err}")
 
         else:
-            logging.error(f"[ERROR]不支持代理系统: {self.os_type}")
+            logging.error(f"不支持代理系统: {self.os_type}")
 
         return False
 
@@ -172,8 +172,8 @@ class ProxyManager:
                 if changed:
                     cfg_file.write_text(json.dumps(cfg_json))
 
-            logging.info(f"[INFO] 代理服务地址: {proxy_config.get('Host',self.proxy_host)}")
-            logging.info(f"[INFO] 代理服务端口: {proxy_config.get('Port',self.proxy_port)}")
+            logging.info(f"代理服务地址: {proxy_config.get('Host',self.proxy_host)}")
+            logging.info(f"代理服务端口: {proxy_config.get('Port',self.proxy_port)}")
 
     def start(self, cfg_path=None): # 需要先启动socket5服务
         if not cfg_path:
@@ -183,18 +183,18 @@ class ProxyManager:
 
         if self.os_type == "windows":
             if not self.proxy_bridge_path:
-                logging.error("[ERROR] ProxyBridge 路径未设置，请先调用 check_proxy_bridge")
+                logging.error("ProxyBridge 路径未设置，请先调用 check_proxy_bridge")
                 return False
             cfg_file = Path(cfg_path)
             if not cfg_file.is_file():
-                logging.error(f"[ERROR] ProxyBridge 配置文件不存在: {cfg_path}")
+                logging.error(f"ProxyBridge 配置文件不存在: {cfg_path}")
                 return False
 
             # 检察更新配置
             try:
                 self._proof(cfg_file)
             except Exception as err:
-                logging.warning(f"[WARN] 检察更新配置失败, 将继续使用默认配置, 有可能导致yaml配置参数失效: {err}")
+                logging.warning(f"检察更新配置失败, 将继续使用默认配置, 有可能导致yaml配置参数失效: {err}")
 
             try:
                 # 启动 ProxyBridge CLI，加载配置文件
@@ -205,7 +205,7 @@ class ProxyManager:
                     "--verbose", "2"
                 ]
 
-                logging.info(f"[INFO] 启动 ProxyBridge: {' '.join(cmd)}")
+                logging.info(f"启动 ProxyBridge: {' '.join(cmd)}")
 
                 # 使用 Popen 后台启动，不阻塞当前进程
                 self.proxy_handle = sub.Popen(
@@ -219,31 +219,31 @@ class ProxyManager:
                     creationflags=sub.CREATE_NEW_PROCESS_GROUP
                 )
 
-                logging.info("[INFO] ProxyBridge 已启动")
+                logging.info("ProxyBridge 已启动")
                 return True
 
             except Exception as err:
-                logging.error(f"[ERROR] 启动失败: {err}")
+                logging.error(f"启动失败: {err}")
                 return False
 
     def close(self):
         if self.os_type == "windows":
             if not self.proxy_handle:
-                logging.warning("[WARN] 关闭反馈: 没有正在运行的 ProxyBridge 进程")
+                logging.warning("关闭反馈: 没有正在运行的 ProxyBridge 进程")
                 return
 
             try:
                 # 发送 Ctrl+C 信号，让程序优雅退出并清理规则
                 self.proxy_handle.send_signal(signal.CTRL_BREAK_EVENT)
-                logging.info("[INFO] 关闭反馈: 已发送停止信号")
+                logging.info("关闭反馈: 已发送停止信号")
 
                 # 等待进程退出
                 self.proxy_handle.wait(timeout=5)
-                logging.info("[INFO] 关闭反馈: ProxyBridge 已关闭")
+                logging.info("关闭反馈: ProxyBridge 已关闭")
 
             except sub.TimeoutExpired:
                 # 超时未退出，强制终止
-                logging.warning("[WARN] 关闭反馈: ProxyBridge 关闭超时，强制终止")
+                logging.warning("关闭反馈: ProxyBridge 关闭超时，强制终止")
                 self.proxy_handle.terminate()
                 try:
                     self.proxy_handle.wait(timeout=3)
@@ -252,7 +252,7 @@ class ProxyManager:
                     self.proxy_handle.wait()
 
             except Exception as err:
-                logging.error(f"[ERROR] 关闭反馈: ProxyBridge 关闭失败: {err}")
+                logging.error(f"关闭反馈: ProxyBridge 关闭失败: {err}")
             finally:
                 self.proxy_handle = None
 

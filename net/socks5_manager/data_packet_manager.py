@@ -119,7 +119,7 @@ class DataPacketManager:
                 data_packets.append(data_packet)
             return data_packets
         except Exception as err:
-            logging.warning(f"[WARN] {err}")
+            logging.warning(f"{err}")
             return
 
     @staticmethod

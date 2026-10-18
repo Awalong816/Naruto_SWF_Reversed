@@ -67,7 +67,7 @@ def find_url(item, mode, pattern):
                 try:
                     data = item.read_bytes()  # 读出二进制数据
                 except Exception as err:
-                    logging.warning(f"[WARN] <{item.name}> 读取二进制数据失败: {err}")
+                    logging.warning(f"<{item.name}> 读取二进制数据失败: {err}")
                     continue
 
             for match in pattern.findall(data):
@@ -363,7 +363,7 @@ def analyze_tbs_cache_front(tbs_cache_path, cfg: Configs):
             server_port = get_send_port(method="entry_file", url=resource_requirement.get("entry.swf"))
             cfg.send_server_prot = server_port
         except Exception as err:
-            logging.warning(f"[WARN] {err}")
+            logging.warning(f"{err}")
 
     return resource_requirement
 
@@ -451,18 +451,18 @@ if __name__ == "__main__":
     try:
         resource_requirement = next(gen)
     except Exception as err:
-        print(f"[ERROR] 后处理 part1 意外错误: {err}")
+        print(f"后处理 part1 意外错误: {err}")
 
     net_client = get_net_client(cfgs)
 
     try:
         net_client.download_requirement(resource_requirement, cfgs.resource_save_path)
     except Exception as err:
-        print(f"[ERROR]下载失败: {err}")
+        print(f"下载失败: {err}")
 
     try:
         next(gen)
     except StopIteration as err:
         pass
     except Exception as err:
-        print(f"[ERROR] 后处理 part2 意外错误: {err}")
+        print(f"后处理 part2 意外错误: {err}")

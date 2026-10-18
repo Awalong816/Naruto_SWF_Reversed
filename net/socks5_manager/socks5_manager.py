@@ -178,7 +178,7 @@ class Socks5Manager:
             name="Socks5Server",  # 线程名字（方便调试）
             daemon=True,  # 守护线程, 随主线程结束而结束
         )
-        logging.info(f"[INFO] ⬆️ Socks5 代理监听启动中...")
+        logging.info(f"⬆️ Socks5 代理监听启动中...")
         self.socket_thread_handle.start()
 
     def _listening(self):
@@ -195,7 +195,7 @@ class Socks5Manager:
             except socket.timeout as timeout: # 正常空置
                 continue # 如果服务关闭了从这里返回
             except OSError as err:
-                logging.error(f"[ERROR] socket 循环遇到系统错误: {err}")
+                logging.error(f"socket 循环遇到系统错误: {err}")
                 break
             # 拿到tcp事件后 推进到这里 上锁添加事件
             with self.socket_lock: # with 本质是占用，其他进程无法获得，locked()是查询状态，与二级线程对应
@@ -239,7 +239,7 @@ class Socks5Manager:
                 # 选择认证方式
                 pipe_client.sendall(b'\x05\x00')  # 选择除了无验证的其他方式需要等待客户端再发送内容，如用户名和密码 选择0则直接握手成功
             except Exception as err:
-                logging.warning(f"[WARN] tcp socket 通道-握手失败: {err}")
+                logging.warning(f"tcp socket 通道-握手失败: {err}")
                 return
 
             # 2.获取目标信息
@@ -308,7 +308,7 @@ class Socks5Manager:
                     f"{target_host}:{target_port}"
                 )
             except Exception as err:
-                logging.warning(f"[WARN] tcp socket 通道-获取目标失败: {err}")
+                logging.warning(f"tcp socket 通道-获取目标失败: {err}")
                 return
 
             # 3.连接目标服务器
@@ -325,7 +325,7 @@ class Socks5Manager:
                     b"\x00\x00"  # 绑定端口 凑最小长度用
                 )
             except Exception as err:
-                logging.warning(f"[WARN] tcp socket 通道-连接目标服务器失败: {err}")
+                logging.warning(f"tcp socket 通道-连接目标服务器失败: {err}")
                 return
 
             # 4.双向转发
@@ -431,9 +431,9 @@ class Socks5Manager:
                         event_data = sock.recv(65536)  # 触发了事件后，不完整没关系，本身有可能是分块的
                         if not event_data:  # 得到空等于一段关闭了连接，正常一直阻塞
                             if sock is src_pipe:
-                                logging.warning(f"[WARN] 游戏客户端与代理层断开连接")
+                                logging.warning(f"游戏客户端与代理层断开连接")
                             elif sock is tag_pipe:
-                                logging.warning(f"[WARN] 代理层与游戏服务器断开连接")
+                                logging.warning(f"代理层与游戏服务器断开连接")
                             session.close()
                             return
 
@@ -474,6 +474,8 @@ class Socks5Manager:
                                     try:
                                         self._log_in_session(session.session_id, session)
                                         logging.info(f"会话 {session.session_id} 已成功注册")
+                                        if self.debug:
+                                            logging.info(f"\n当前所有会话状态:\n{self.having_sessions}\n")
                                     except Exception as err:
                                         logging.warning(f"添加新会话失败: {err}")
                                         return
@@ -486,11 +488,11 @@ class Socks5Manager:
             self._log_off_session(session.session_id, session)
             logging.info(f"会话 {session.session_id} 已成功注销")
             if self.debug:
-                logging.info(f"当前所有会话状态:\n{self.having_sessions}")
+                logging.info(f"\n当前所有会话状态:\n{self.having_sessions}\n")
             session.close()
 
     def close(self):
-        logging.info(f"[INFO] Socks5 监听服务正在停止...")
+        logging.info(f"Socks5 监听服务正在停止...")
         # 退出所有循环
         self.stop_signal.set()
         # 删除所有已追踪通道并关闭
@@ -518,12 +520,12 @@ class Socks5Manager:
 
             if thread.is_alive():
                 logging.warning(
-                    "[WARN] SOCKS5监听线程未按时退出"
+                    "SOCKS5监听线程未按时退出"
                 )
 
         self.socket_handle = None
         self.socket_thread_handle = None
-        logging.info(f"[INFO] Socks5 服务已关闭")
+        logging.info(f"Socks5 服务已关闭")
 
     def _handle_udp_associate(self, pipe_client):
         udp_socket = socket.socket(

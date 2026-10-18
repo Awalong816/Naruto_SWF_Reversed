@@ -100,15 +100,15 @@ class ModManager:
             exist_ok=True,  # 目录已存在时不报错
         )
 
-        logging.info(f"[INFO] 开始注册mod依赖...")
+        logging.info(f"开始注册mod依赖...")
         for mod_pack in mods_dir.iterdir():
             if mod_pack.is_dir():
                 for mod_file in mod_pack.glob("*.py"):
                     try:
                         self._log_in_mod(mod_file)
-                        logging.info(f"[INFO]   注册Mod <{mod_pack.stem}> 依赖成功")
+                        logging.info(f"  注册Mod <{mod_pack.stem}> 依赖成功")
                     except Exception as err:
-                        logging.warning(f"[WARN]    注册Mod <{mod_file.stem}> 依赖失败: {err}")
+                        logging.warning(f"   注册Mod <{mod_file.stem}> 依赖失败: {err}")
 
     def _log_in_mod(self, mod_file: Path):
         """
