@@ -113,6 +113,9 @@ class ProtobufReader:
 
         return fields
 
+    def _reverse_protobuf(self, body):
+        pass
+
     def read_bytes(self, body: bytes) -> str:
         """
         body必须是：
@@ -122,6 +125,15 @@ class ProtobufReader:
         result = self._read_protobuf(body)
 
         return result
+
+    def reverse_body(self, body):
+        """
+        body必须是
+        1. 符合结构的dict
+        :param body:
+        :return:
+        """
+        pass
 
 
 def _get_protobuf_reader():
