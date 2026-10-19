@@ -24,7 +24,7 @@ def proxy_start(cfg: Configs, net_client: NetClient):
     # 启用前端
     # proxy 管理器装配完成后、socks5 服务启动之前：创建前端
     frontend = get_frontend(
-        net_client.socks5_manager,
+        socks5_manager=net_client.socks5_manager,
         on_close=lambda: net_client.close(),
         poll_ms=400,
     )
