@@ -372,8 +372,10 @@ class Socks5Manager:
         with self.session_lock:
             if len(self.having_sessions) < self.max_service_session:
                 if session_id not in self.having_sessions.keys():
+                    # 注册到会话管理表
                     self.having_sessions[session_id] = body
                     # TODO 通知前端session新增一行
+                    # 为会话注册状态机
                     self.mods_manager.log_in_session(session_id)
                 else:
                     raise ValueError(f"已存在同名会话")
@@ -385,8 +387,10 @@ class Socks5Manager:
             return
         with self.session_lock:
             if self.having_sessions.get(session_id) is body:  # 只删自己那条
+                # 删除会话管理表中的索引内容
                 self.having_sessions.pop(session_id, None)  # 默认值，绝不 KeyError
                 # TODO 通知前端删除session这一行
+                # 注销该会话的状态机
                 self.mods_manager.log_off_session(session_id)
 
     def _communication( # 一条连接链

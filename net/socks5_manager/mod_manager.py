@@ -19,7 +19,7 @@ class BaseMod:
         # 可变
         self.enabled: bool = False
 
-    def enabled_init(self):
+    def enabled_init(self) -> list[dict]:
         """
         mod在启用时开始需要发送的动作，可以为空
         :return:
@@ -186,6 +186,7 @@ class ModManager:
             except Exception as err:
                 logging.warning(f"会话 {session_id} 关闭mod {mod_id} 失败: {err}")
 
+    # ======================== 业务方法 ======================
     def start_mod_in_session(self, session_id, mod_id):
         """
         留给前端的接口
@@ -195,7 +196,7 @@ class ModManager:
         """
         pass
 
-    def event_trigger(self, session_id, data_packets: DataPack):
+    def event_trigger(self, session_id, data_packets: list[DataPack]):
         pass
 
     def timer_trigger(self, session_id):
