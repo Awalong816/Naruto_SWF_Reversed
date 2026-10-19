@@ -188,14 +188,14 @@ if __name__ == "__main__":
     # ======= 2.开始代理 ========
     try:
         # 创建代理后得到前端
-        frontend = proxy_start(global_config, global_net_client)
+        proxy_frontend = proxy_start(global_config, global_net_client)
     except Exception as err:
         logging.error(f"启动本地代理失败: {err}")
         exit(1)
 
     # 阻塞：进入 GUI 主循环（前端内带轮询，关闭窗口即退出）
     try:
-        frontend.run()
+        proxy_frontend.run()
     finally:
         logging.info("退出清理: net_client...")
         global_net_client.close()
