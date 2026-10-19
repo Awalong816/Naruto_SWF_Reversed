@@ -187,6 +187,16 @@ class ModManager:
                 logging.warning(f"会话 {session_id} 关闭mod {mod_id} 失败: {err}")
 
     # ======================== 业务方法 ======================
+    def list_session_mod_state(self, session_id):
+        session_mod_map = {}
+        session_mods = self.session_mods_state[session_id]
+        for mod_id, mod_runtime in session_mods.items():
+            session_mod_map[mod_id] = {
+                "enabled": mod_runtime.is_enabled(),
+                "info": mod_runtime.instance.MOD_INFO,
+                "running_log": mod_runtime.running_log,
+            }
+
     def start_mod_in_session(self, session_id, mod_id):
         """
         留给前端的接口

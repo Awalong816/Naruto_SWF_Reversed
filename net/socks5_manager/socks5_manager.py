@@ -32,7 +32,7 @@ class Session:
         repr=False,
     )
 
-    context: str | None
+    context: dict = None
     uin: str = None # 当前登录的QQ账号
     role_id: str = None # 当前角色名，本人恒为0
     server_id: int = None # 当前区服
@@ -59,7 +59,10 @@ class Session:
                 else:
                     server_sign = self.server_id
 
-                self.session_id = str(server_sign) + "区-QQ<" + str(self.uin)+">"
+                session_id = str(server_sign) + "区-QQ<" + str(self.uin)+">"
+
+                self.session_id = session_id
+                self.context["session_id"] = session_id
         except TypeError as err:
             raise TypeError(f"区号: {self.server_id} 绑定出错: {err}")
 
@@ -113,9 +116,10 @@ class Socks5Manager:
         self.stop_signal.set() # true是停止
 
         # 组件
-        # # mod
+        # # mod管理器
         self.mods_manager = get_mod_manager(mods_path)
         self.mods_manager.log_in_mods()
+        # # 展示前端
 
         # 前序分析可能ip，作为白名单
         if type(t_host_domain) is str:
@@ -132,7 +136,7 @@ class Socks5Manager:
         self.socket_lock = th.Lock() # 线程锁
         self.session_lock = th.Lock() # 会话锁
         self.pipe_clients = set() # 自动快速去重
-        self.having_sessions = {} # 管理的会话
+        self.having_sessions: dict[str, Session] = {} # 管理的会话
         # 限制
         self.max_service_session = max_service # 最多同时服务的会话
         self.max_wait_queue = max_input # listen的最大等待队伍长度
@@ -180,6 +184,18 @@ class Socks5Manager:
         )
         logging.info(f"⬆️ Socks5 代理监听启动中...")
         self.socket_thread_handle.start()
+
+    def list_having_session(self):
+        session_info = {}
+        with self.session_lock:
+            for session_id, session_body in self.having_sessions.items():
+                if session_id:
+                    session_info[session_id] = {
+                        "user": session_body.session_id,
+                        "客户端地址": f"{session_body.context['src_host']}:{session_body.context['src_port']}",
+                        "服务器地址": f"{session_body.context['tag_host']}:{session_body.context['tag_host']}"
+                    }
+        return session_info
 
     def _listening(self):
         """
@@ -459,8 +475,6 @@ class Socks5Manager:
                             continue
 
                         if data_packet_manager is not None:  # 不是一次发送对应一个完整包，是一对n包括0
-                            if session.session_id is not None:
-                                context["session_id"] = session.session_id
 
                             data_packets = data_packet_manager.parse_data(
                                 context=context,
