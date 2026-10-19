@@ -189,13 +189,15 @@ class ModManager:
     # ======================== 业务方法 ======================
     def list_session_mod_state(self, session_id):
         session_mod_map = {}
-        session_mods = self.session_mods_state[session_id]
-        for mod_id, mod_runtime in session_mods.items():
-            session_mod_map[mod_id] = {
-                "enabled": mod_runtime.is_enabled(),
-                "info": mod_runtime.instance.MOD_INFO,
-                "running_log": mod_runtime.running_log,
-            }
+        with self.mod_lock:
+            session_mods = self.session_mods_state.get(session_id) or {}
+            for mod_id, mod_runtime in session_mods.items():
+                session_mod_map[mod_id] = {
+                    "enabled": mod_runtime.is_enabled(),
+                    "info": dict(mod_runtime.instance.MOD_INFO),
+                    "running_log": list(mod_runtime.running_log),
+                }
+        return session_mod_map
 
     def start_mod_in_session(self, session_id, mod_id):
         """

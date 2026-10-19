@@ -6,6 +6,7 @@ from config import Configs
 from workflow import get_qqgamebox_client_path, analyze_from_server, analyze_tbs_cache_front, proxy_start
 from net import get_net_client, get_proxy_manager
 
+
 logging.basicConfig(level=logging.INFO) # 最低播报等级
 
 
@@ -186,17 +187,17 @@ if __name__ == "__main__":
 
     # ======= 2.开始代理 ========
     try:
-        proxy_start(global_config, global_net_client)
+        # 创建代理后得到前端
+        frontend = proxy_start(global_config, global_net_client)
     except Exception as err:
         logging.error(f"启动本地代理失败: {err}")
         exit(1)
 
-    # 阻塞
-    input(f"无UI阻塞,输入任意退出:")
-
-    # ======= 退出清理 ========
-    logging.info(f"退出清理: net_client...")
-    global_net_client.close()
-
+    # 阻塞：进入 GUI 主循环（前端内带轮询，关闭窗口即退出）
+    try:
+        frontend.run()
+    finally:
+        logging.info("退出清理: net_client...")
+        global_net_client.close()
 
 

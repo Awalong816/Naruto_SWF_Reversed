@@ -190,10 +190,12 @@ class Socks5Manager:
         with self.session_lock:
             for session_id, session_body in self.having_sessions.items():
                 if session_id:
+                    context = session_body.context or {}
                     session_info[session_id] = {
-                        "user": session_body.session_id,
-                        "客户端地址": f"{session_body.context['src_host']}:{session_body.context['src_port']}",
-                        "服务器地址": f"{session_body.context['tag_host']}:{session_body.context['tag_host']}"
+                        "账号(uin)": session_body.uin,
+                        "区服(server_id)": session_body.server_id,
+                        "客户端地址": f"{context.get('src_host')}:{context.get('src_port')}",
+                        "服务器地址": f"{context.get('tag_host')}:{context.get('tag_port')}",
                     }
         return session_info
 

@@ -2,6 +2,7 @@ import logging
 
 from config import Configs
 from net import NetClient, ProxyManager
+from frontend import get_frontend
 
 
 def proxy_start(cfg: Configs, net_client: NetClient):
@@ -20,10 +21,20 @@ def proxy_start(cfg: Configs, net_client: NetClient):
     if not net_client.proxy_manager.check_proxy_bridge():
         exit(1)
 
+    # 启用前端
+    # proxy 管理器装配完成后、socks5 服务启动之前：创建前端
+    frontend = get_frontend(
+        net_client.socks5_manager,
+        on_close=lambda: net_client.close(),
+        poll_ms=400,
+    )
+
     # 先启动 socks5 服务
     net_client.socks5_manager.start()
     # 后启动 proxy 代理规则
     net_client.proxy_manager.start()
+
+    return frontend
 
 
 
