@@ -1,6 +1,6 @@
 import os
 import json
-import time
+from datetime import datetime
 from pathlib import Path
 
 from net.socks5_manager.mod_manager import BaseMod
@@ -314,8 +314,42 @@ class AutoRobAttackMod(BaseMod):
         }
 
     # ============= 继承方法 =============
-    def enabled_init(self):
-        return [self.send_198935_action()]
+    def _enabled_init(self, now=None, **kwargs):
+        """启用时的初始化：now 由管理器统一传入（datetime），缺省才回落本机时间"""
+        now = now or datetime.now()
+        now_time = now.time()
+
+        fits = MOD_INFO.get("fit", [])
+        if not fits:
+            raise ValueError(f"MOD_INFO 缺少字段 fit")
+        time_slots = fits[0].get("time_slot")
+
+        if time_slots:
+            time_pass = False
+            for slot_start, slot_end in time_slots:
+                start = datetime.strptime(slot_start, "%H:%M").time()
+                end = datetime.strptime(slot_end, "%H:%M").time()
+
+                if start <= end and start <= now_time <= end:
+                    time_pass = True
+                    break
+            if not time_pass:
+                raise ValueError(f"不处于mod要求时间段（当前 {now_time:%H:%M}）")
+
+        # 本mod没有开场需要发送的动作
+        return []
+
+    def start(self, now=None, **kwargs):
+        try:
+            self.enabled = True
+            actions = self._enabled_init(now=now)
+            return actions
+        except Exception as err:
+            self.enabled = False
+            raise err
+
+    def stop(self, now=None, **kwargs):
+        self.enabled = False
 
 
 SERVER_MOD_CLASS = AutoRobAttackMod
@@ -325,6 +359,7 @@ def test(data: list | dict):
     mod = AutoRobAttackMod()
     mod.load_config()
     result = mod._protobuf2readable(data)
+    mod.enabled_init()
     return result
 
 

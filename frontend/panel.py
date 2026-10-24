@@ -2,6 +2,8 @@ import json
 import logging
 import tkinter as tk
 import tkinter.font as tkfont
+from datetime import datetime
+from tkinter import messagebox
 
 # ================= 配色 =================
 ROW_BLUE = "#E8F2FC"        # 淡蓝（斑马纹 A）
@@ -102,6 +104,8 @@ class FrontendPanel:
 
         self.selected_session_id = None
         self.selected_mod_id = None
+        # 状态栏临时提示的定时清除句柄
+        self._status_after_id = None
 
         # 渲染签名：与上次一致就跳过重建，避免无谓闪动
         self._session_sig = None
@@ -165,10 +169,22 @@ class FrontendPanel:
 
     # ================= 构建 =================
     def _build_topbar(self):
-        # 空状态栏：先留白，后续可往里放状态文本
+        # 状态栏：默认无任何文本；只有操作反馈时才临时显示
         bar = tk.Frame(self.root, bg=TOPBAR_BG, height=int(34 * self.scale))
         bar.pack(fill="x", side="top")
         bar.pack_propagate(False)
+
+        self.status_label = tk.Label(
+            bar, text="", bg=TOPBAR_BG, fg=TEXT_SUB, anchor="w", font=self.body_font,
+        )
+        self.status_label.pack(side="left", padx=10)
+
+        # 最右侧实时时间
+        self.clock_label = tk.Label(
+            bar, text="", bg=TOPBAR_BG, fg=TEXT_SUB, anchor="e", font=self.body_font,
+        )
+        self.clock_label.pack(side="right", padx=10)
+        self._update_clock()
 
     def _build_body(self):
         body = tk.Frame(self.root, bg=PANEL_BG)
@@ -237,8 +253,12 @@ class FrontendPanel:
             pass
 
     def _refresh(self):
+        self._update_clock()
         self._render_all()
         self.root.after(self.poll_ms, self._refresh)
+
+    def _update_clock(self):
+        self.clock_label.configure(text=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     def _render_all(self):
         sessions = self.data_source.sessions()
@@ -337,8 +357,8 @@ class FrontendPanel:
         )
         name_label.pack(side="left")
 
-        # 框选开关：先只做「状态指示」，不接入点击
-        self._make_switch(row, enabled, background).pack(side="right", padx=12)
+        # 开关：点击即切换该 mod 的开关状态
+        self._make_switch(row, enabled, background, self.selected_session_id, mod_id).pack(side="right", padx=12)
 
         for widget in (row, name_label):
             widget.bind("<Button-1>", lambda _event, mid=mod_id: self._select_mod(mid))
@@ -354,13 +374,50 @@ class FrontendPanel:
         self._mod_sig = None
         self._render_all()
 
-    def _make_switch(self, parent, enabled: bool, background: str):
+    def _toggle_mod(self, session_id: str, mod_id: str, target_enabled: bool):
+        """点击开关 → 让 mod 真正进入/退出开启态（开启会调用 mod 自己的初始化）"""
+        ok, message = self.data_source.set_mod_enabled(session_id, mod_id, target_enabled)
+        if ok:
+            self._set_status(message, True)
+        else:
+            # 失败不进状态栏，直接弹通知窗（只有「确定」）
+            self._clear_status()
+            messagebox.showwarning("mod 操作失败", message, parent=self.root)
+        self._mod_sig = None
+        self._render_all()
+
+    def _set_status(self, message: str, ok: bool = True, clear_ms: int = 4000):
+        """状态栏临时提示：默认 4 秒后自动清空，恢复成空状态栏"""
+        self.status_label.configure(text=message, fg=TEXT_SUB if ok else "#B04A3A")
+        if self._status_after_id is not None:
+            try:
+                self.root.after_cancel(self._status_after_id)
+            except Exception:
+                pass
+        self._status_after_id = self.root.after(clear_ms, self._clear_status)
+
+    def _clear_status(self):
+        self._status_after_id = None
+        self.status_label.configure(text="")
+
+    def _make_switch(
+            self,
+            parent,
+            enabled: bool,
+            background: str,
+            session_id: str = None,
+            mod_id: str = None,
+            ):
         s = self.scale
 
         def k(value):
             return int(round(value * s))
 
-        canvas = tk.Canvas(parent, width=k(36), height=k(18), bg=background, highlightthickness=0, bd=0)
+        canvas = tk.Canvas(
+            parent, width=k(36), height=k(18), bg=background,
+            highlightthickness=0, bd=0,
+            cursor="hand2" if mod_id else "",
+        )
         track = SWITCH_ON if enabled else SWITCH_OFF
         canvas.create_oval(k(1), k(3), k(17), k(15), fill=track, outline=track)
         canvas.create_oval(k(19), k(3), k(35), k(15), fill=track, outline=track)
@@ -368,6 +425,12 @@ class FrontendPanel:
         knob_x = k(27) if enabled else k(9)
         knob_r = k(6)
         canvas.create_oval(knob_x - knob_r, k(3), knob_x + knob_r, k(15), fill="#FFFFFF", outline="#FFFFFF")
+
+        if mod_id:
+            canvas.bind(
+                "<Button-1>",
+                lambda _event, sid=session_id, mid=mod_id, on=enabled: self._toggle_mod(sid, mid, not on),
+            )
         return canvas
 
     # ================= log 栏 =================

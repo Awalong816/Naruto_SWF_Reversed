@@ -2,6 +2,7 @@ import logging
 import queue
 import json
 import threading as th
+from datetime import datetime
 from dataclasses import dataclass
 from pathlib import Path
 from importlib import util as import_util
@@ -19,7 +20,7 @@ class BaseMod:
         # 可变
         self.enabled: bool = False
 
-    def enabled_init(self) -> list[dict]:
+    def _enabled_init(self, now=None, **kwargs) -> list[dict]:
         """
         mod在启用时开始需要发送的动作，可以为空
         :return:
@@ -48,10 +49,10 @@ class BaseMod:
         """
         ...
 
-    def start(self):
+    def start(self, now=None, **kwargs):
         ...
 
-    def stop(self):
+    def stop(self, now=None, **kwargs):
         ...
 
 
@@ -67,13 +68,6 @@ class ModRunTime:
     def is_enabled(self):
         return self.instance.enabled
 
-    def start(self):
-        self.instance.enabled = True
-        return self.instance.enabled_init() # 传递初始化事件
-
-    def stop(self):
-        self.instance.enabled = False
-
 
 class ModManager:
     """
@@ -86,6 +80,7 @@ class ModManager:
 
         self.mods_lib = {} # 静态注册，保留mod的所有信息
         self.session_mods_state: dict[str, dict[str, ModRunTime]] = {}
+        # mod产生的所有动作方向都应该是发送给服务器
         self.session_extra_queue: dict[str, queue.Queue] = {} # 额外动作队列字典，因为不是所有动作都由已知session_id的data_packet发送，比如enabled_init,定时触发事件
 
         # 组件
@@ -157,6 +152,11 @@ class ModManager:
         if mod_id not in self.mods_lib.keys():
             self.mods_lib[mod_id] = mod_cls
 
+    @staticmethod
+    def _get_now():
+        now = datetime.now()
+        return now
+
     def log_in_session(self, session_id):
         with self.mod_lock:
             if session_id not in self.session_mods_state:
@@ -182,7 +182,7 @@ class ModManager:
             return
         for mod_id, mod_runtime in runtimes.items():  # 锁外停
             try:
-                mod_runtime.stop()
+                mod_runtime.instance.stop()
             except Exception as err:
                 logging.warning(f"会话 {session_id} 关闭mod {mod_id} 失败: {err}")
 
@@ -200,13 +200,26 @@ class ModManager:
         return session_mod_map
 
     def start_mod_in_session(self, session_id, mod_id):
-        """
-        留给前端的接口
-        :param session_id:
-        :param mod_id:
-        :return:
-        """
-        pass
+        try:
+            now = self._get_now()
+            session_table = self.session_mods_state[session_id]
+            mod_instance = session_table[mod_id].instance
+            result = mod_instance.start(now=now)
+            self.session_mods_state[session_id][mod_id].running_log.append(f"{now.strftime('%Y-%m-%d %H:%M:%S')}:\n<{self.session_mods_state[session_id][mod_id].instance.MOD_INFO.get('name')}> 开始运行")
+            # TODO 读动作内容和二进制格式压缩成body加头打包成DataPack发送给服务器
+            print(f"action result: {result}")
+        except Exception as err:
+            raise err
+
+    def stop_mod_in_session(self, session_id, mod_id):
+        try:
+            now = self._get_now()
+            session_table = self.session_mods_state[session_id]
+            mod_instance = session_table[mod_id].instance
+            mod_instance.stop()
+            self.session_mods_state[session_id][mod_id].running_log.append(f"{now.strftime('%Y-%m-%d %H:%M:%S')}:\n<{self.session_mods_state[session_id][mod_id].instance.MOD_INFO.get('name')}> 停止运行")
+        except Exception as err:
+            raise err
 
     def event_trigger(self, session_id, data_packets: list[DataPack]):
         pass
