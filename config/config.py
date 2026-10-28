@@ -1,5 +1,6 @@
 import os
 import yaml
+import random
 
 class Configs:
     def __init__(self):
@@ -15,7 +16,7 @@ class Configs:
         self.net_max_connection = 50
         self.net_timeout = 60
         self.net_proxy_host = "127.0.0.1"
-        self.net_proxy_prot = 19080
+        self.net_proxy_port = 19080
         self.net_proxy_max_service_sessions = 8
         self.net_proxy_max_input_queue = 100
         # system
@@ -55,7 +56,7 @@ class Configs:
             # # proxy
             net_proxy_cfg = net_work_cfg.get("proxy", {})
             self.net_proxy_host = net_proxy_cfg.get("proxy_host", "127.0.0.1")
-            self.net_proxy_prot = net_proxy_cfg.get("proxy_prot", 19080)
+            self.net_proxy_port = net_proxy_cfg.get("proxy_prot", "random")
             self.net_proxy_max_service_sessions = net_proxy_cfg.get("max_service_sessions", 8)
             self.net_proxy_max_input_queue = net_proxy_cfg.get("max_wait_queue", 100)
 

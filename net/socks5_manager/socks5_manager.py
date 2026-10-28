@@ -587,7 +587,7 @@ class Socks5Manager:
 
 def get_socks_manager(cfg: Configs):
     host = cfg.net_proxy_host or "127.0.0.1"
-    port = int(cfg.net_proxy_prot or 19080)
+    port = int(cfg.net_proxy_port or 19080)
     max_service_sessions = int(cfg.net_proxy_max_service_sessions or 8)
     max_input_events = int(cfg.net_proxy_max_input_queue)
     mods_path = cfg.mods_path
