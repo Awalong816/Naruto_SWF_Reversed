@@ -171,6 +171,7 @@ class ProxyManager:
 
                 if changed:
                     cfg_file.write_text(json.dumps(cfg_json))
+                    logging.info("proxy-bridge 配置文件以改写: 同步全局配置")
 
             logging.info(f"代理服务地址: {proxy_config.get('Host',self.proxy_host)}")
             logging.info(f"代理服务端口: {proxy_config.get('Port',self.proxy_port)}")
