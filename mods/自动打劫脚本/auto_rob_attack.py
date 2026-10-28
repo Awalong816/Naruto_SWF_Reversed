@@ -285,8 +285,7 @@ class AutoRobAttackMod(BaseMod):
 
     def load_config(self, path=None):
         if not path:
-            dir_path = os.path.dirname(os.path.abspath(__file__))
-            path = dir_path + r"\脚本配置.json"
+            path = Path(__file__).resolve().with_name("脚本配置.json")
 
         cfg_path = Path(path)
         try:
@@ -359,7 +358,7 @@ def test(data: list | dict):
     mod = AutoRobAttackMod()
     mod.load_config()
     result = mod._protobuf2readable(data)
-    mod.enabled_init()
+    # mod._enabled_init()
     return result
 
 
