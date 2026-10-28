@@ -285,7 +285,8 @@ class AutoRobAttackMod(BaseMod):
 
     def load_config(self, path=None):
         if not path:
-            path = Path(__file__).resolve().with_name("脚本配置.json")
+            dir_path = os.path.dirname(os.path.abspath(__file__))
+            path = os.path.join(dir_path, r"脚本配置.json")
 
         cfg_path = Path(path)
         try:
