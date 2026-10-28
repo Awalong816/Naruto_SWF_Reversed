@@ -205,7 +205,7 @@ class ModManager:
             session_table = self.session_mods_state[session_id]
             mod_instance = session_table[mod_id].instance
             result = mod_instance.start(now=now)
-            self.session_mods_state[session_id][mod_id].running_log.append(f"{now.strftime('%Y-%m-%d %H:%M:%S')}:\n<{self.session_mods_state[session_id][mod_id].instance.MOD_INFO.get('name')}> 开始运行")
+            session_table[mod_id].running_log.append(f"{now.strftime('%Y-%m-%d %H:%M:%S')}:\n<{self.session_mods_state[session_id][mod_id].instance.MOD_INFO.get('name')}> 开始运行")
             # TODO 读动作内容和二进制格式压缩成body加头打包成DataPack发送给服务器
             print(f"action result: {result}")
         except Exception as err:
@@ -217,7 +217,7 @@ class ModManager:
             session_table = self.session_mods_state[session_id]
             mod_instance = session_table[mod_id].instance
             mod_instance.stop()
-            self.session_mods_state[session_id][mod_id].running_log.append(f"{now.strftime('%Y-%m-%d %H:%M:%S')}:\n<{self.session_mods_state[session_id][mod_id].instance.MOD_INFO.get('name')}> 停止运行")
+            session_table[session_id][mod_id].running_log.append(f"{now.strftime('%Y-%m-%d %H:%M:%S')}:\n<{self.session_mods_state[session_id][mod_id].instance.MOD_INFO.get('name')}> 停止运行")
         except Exception as err:
             raise err
 
