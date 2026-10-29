@@ -1,8 +1,10 @@
+import logging
 import os
 import json
 from datetime import datetime
 from pathlib import Path
 
+from net.socks5_manager.data_packet_manager import DataPack
 from net.socks5_manager.mod_manager import BaseMod
 
 # 模组信息提到类顶方便提取
@@ -196,6 +198,7 @@ class AutoRobAttackMod(BaseMod):
         # enabled = false
         super().__init__()
         # 自带成员
+        self.config_path: Path | None
         self.attack_list = []
 
     # ============= 自我方法 =============
@@ -203,6 +206,27 @@ class AutoRobAttackMod(BaseMod):
     def _zigzag_decode(value: int) -> int:
         """Protobuf sint32/sint64 转有符号整数"""
         return (value >> 1) ^ -(value & 1)
+
+    @staticmethod
+    def _get_time_slots():
+        fits = MOD_INFO.get("fit", [])
+        if not fits:
+            return None
+        time_slots = fits[0].get("time_slot")
+        return time_slots
+
+    @staticmethod
+    def _time_pass(time_slots, now=None):
+        now = now or datetime.now()
+        now_time = now.time()
+
+        for slot_start, slot_end in time_slots:
+            start = datetime.strptime(slot_start, "%H:%M").time()
+            end = datetime.strptime(slot_end, "%H:%M").time()
+
+            if start <= end and start <= now_time <= end:
+                return True
+        return False
 
     def _apply_schema(self, fields: list | dict, schema: dict = ROB_LIST_RESPONSE_SCHEMA):
         """
@@ -283,14 +307,29 @@ class AutoRobAttackMod(BaseMod):
                 continue
         return format_rob_list
 
+    def _save_attack_list_config(self):
+        with open(self.config_path, "r", encoding="utf-8") as file:
+            cfg_data = json.load(file)
+            if self.attack_list and cfg_data and cfg_data.get("attack_list", []):
+                cfg_data["attack_list"] = self.attack_list
+                self.config_path.write_text(json.dumps(
+                        cfg_data,
+                        ensure_ascii=False,
+                        indent=4,
+                    ),
+                    encoding="utf-8"
+                )
+
+
     def load_config(self, path=None):
         if not path:
             dir_path = os.path.dirname(os.path.abspath(__file__))
             path = os.path.join(dir_path, r"脚本配置.json")
 
         cfg_path = Path(path)
+        self.config_path = cfg_path
         try:
-            with open(cfg_path, "r", encoding="utf-8") as file:
+            with open(self.config_path, "r", encoding="utf-8") as file:
                 cfg_data = json.load(file)
         except Exception as err:
             raise err
@@ -308,34 +347,18 @@ class AutoRobAttackMod(BaseMod):
 
     # 组装请求列表命令
     def send_198935_action(self):
-        client_198935_action = {
-            "direction": "game->server",
-            "content": "",
-        }
+        # TODO: 做成DataPack交给data_packet_manager转回bytes
+        pass
 
     # ============= 继承方法 =============
     def _enabled_init(self, now=None, **kwargs):
         """启用时的初始化：now 由管理器统一传入（datetime），缺省才回落本机时间"""
-        now = now or datetime.now()
-        now_time = now.time()
+        time_slots = self._get_time_slots()
+        if not time_slots:
+            raise ValueError("fit 缺失字段 'time_slots'")
 
-        fits = MOD_INFO.get("fit", [])
-        if not fits:
-            raise ValueError(f"MOD_INFO 缺少字段 fit")
-        time_slots = fits[0].get("time_slot")
-
-        if time_slots:
-            time_pass = False
-            for slot_start, slot_end in time_slots:
-                start = datetime.strptime(slot_start, "%H:%M").time()
-                end = datetime.strptime(slot_end, "%H:%M").time()
-
-                if start <= end and start <= now_time <= end:
-                    time_pass = True
-                    break
-            if not time_pass:
-                raise ValueError(f"不处于mod要求时间段（当前 {now_time:%H:%M}）")
-
+        if time_slots and (not self._time_pass(time_slots, now=now)):
+            raise ValueError("不在可运行的时间段内")
         # 本mod没有开场需要发送的动作
         return []
 
@@ -351,6 +374,48 @@ class AutoRobAttackMod(BaseMod):
     def stop(self, now=None, **kwargs):
         self.enabled = False
 
+    def event_trigger(self, data, now=None, **kwargs):
+        # 时间限制
+        time_slots = self._get_time_slots()
+        if not time_slots:
+            self.enabled = False
+            raise ValueError("fit 缺失字段 'time_slots'")
+
+        if time_slots and (not self._time_pass(time_slots, now=now)):
+            self.enabled = False
+            raise ValueError("不在可运行的时间段内")
+
+        # 业务内容
+        if not isinstance(data, list):
+            raise TypeError(f"<auto_rob_attack event_trigger> only support list input")
+        format_data = self._protobuf2readable(data)
+        print(format_data)
+        for index, aim in enumerate(self.attack_list):
+            # 每个session一个实例，不需要上锁
+            aim_name = aim["name"]
+            aim_uin = aim["uin"]
+            aim_zone_id = aim["zone_id"]
+
+            for item in format_data:
+                print(f"aim:{aim_name}: {aim_zone_id} -- item:{item.get('name')}:{item.get('server_id')}")
+                if (item.get("name") == aim_name or item.get("uin") == aim_uin) and (
+                        item.get("server_id") == aim_zone_id):
+                    if not aim_uin and item.get("uin"):
+                        self.attack_list[index]["uin"] = item.get("uin")
+                        try:
+                            self._save_attack_list_config()
+                            logging.info(f"更新 mod <auto_rob_attack> 配置文件成功")
+                        except Exception as err:
+                            logging.warning(f"更新 mod <auto_rob_attack> 配置文件失败: {err}")
+                    if item.get("task_id") in SS_TASK_IDS:
+                        self.enabled = False # 成功进入战斗后退出脚本
+                        print("找到")
+                        # TODO: find aim 发送198936
+                        return
+
+        print("没有找到")
+        # TODO: 没有找到，继续循环出发198935
+
 
 SERVER_MOD_CLASS = AutoRobAttackMod
 
@@ -358,7 +423,7 @@ SERVER_MOD_CLASS = AutoRobAttackMod
 def test(data: list | dict):
     mod = AutoRobAttackMod()
     mod.load_config()
-    result = mod._protobuf2readable(data)
+    result = mod.event_trigger(data)
     # mod._enabled_init()
     return result
 

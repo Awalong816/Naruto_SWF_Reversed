@@ -34,7 +34,7 @@ class BaseMod:
         """
         ...
 
-    def event_trigger(self, data_packet: bytes):
+    def event_trigger(self, data, now=None, **kwargs):
         """
         触发事件，非必要
         :param data_packet:
@@ -42,7 +42,7 @@ class BaseMod:
         """
         ...
 
-    def timer_trigger(self):
+    def timer_trigger(self, now=None, **kwargs):
         """
         定时事件，非必要
         :return:
@@ -178,7 +178,6 @@ class ModManager:
                     buckets.append({
                         "mod_id": mod_id,
                         "data_type": fit.get("data_type"),
-                        "time_slot": fit.get("time_slot"),
                     })
 
     @staticmethod
@@ -252,6 +251,27 @@ class ModManager:
 
     def event_trigger(self, session_id, data_packets: list[DataPack]):
         pass
+        # for data_packet in data_packets:
+        #     key = tuple((data_packet.direction, data_packet.command_id))
+        #     if key in self.mods_lib.event_trigger_map:
+        #         for _mod in self.mods_lib.event_trigger_map[key]:
+        #             mod_id = _mod.mod_id
+        #             if self.session_mods_state[session_id][mod_id].is_enabled():
+        #                 mod_instance = self.session_mods_state[session_id][_mod].instance
+        #                 data_type = _mod["data_type"]
+        #                 match data_type:
+        #                     case "protobuf":
+        #                         context_data = self.type_reader.read_bytes(data_packet.value_data[36:], "protobuf")
+        #                     case _:
+        #                         context_data = data_packet.value_data[36:]
+        #                 # noinspection PyUnboundLocalVariable
+        #                 action_context = mod_instance.event_trigger(
+        #                     data=context_data,
+        #                     now=self._get_now(),
+        #                 )
+        #                 # TODO: 修改后重新组装头部
+        #             else:
+        #                 continue
 
     def timer_trigger(self, session_id):
         pass
