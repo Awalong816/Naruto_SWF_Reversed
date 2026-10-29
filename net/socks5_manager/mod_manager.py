@@ -3,7 +3,7 @@ import queue
 import json
 import threading as th
 from datetime import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from importlib import util as import_util
 
@@ -55,6 +55,11 @@ class BaseMod:
     def stop(self, now=None, **kwargs):
         ...
 
+@dataclass
+class ModsLib:
+    mod_self: dict = field(default_factory=dict)
+    event_trigger_map: dict = field(default_factory=dict)
+
 
 # 每个模型的运行状态
 class ModRunTime:
@@ -78,7 +83,7 @@ class ModManager:
 
         self.mod_lock = th.Lock()
 
-        self.mods_lib = {} # 静态注册，保留mod的所有信息
+        self.mods_lib = ModsLib() # 静态注册，保留mod的所有信息
         self.session_mods_state: dict[str, dict[str, ModRunTime]] = {}
         # mod产生的所有动作方向都应该是发送给服务器
         self.session_extra_queue: dict[str, queue.Queue] = {} # 额外动作队列字典，因为不是所有动作都由已知session_id的data_packet发送，比如enabled_init,定时触发事件
@@ -149,8 +154,32 @@ class ModManager:
                 raise TypeError(f"SERVER_MOD_CLASS 缺少必要方法{method}")
 
         # 注册进mod表
-        if mod_id not in self.mods_lib.keys():
-            self.mods_lib[mod_id] = mod_cls
+        if mod_id not in self.mods_lib.mod_self.keys():
+            self.mods_lib.mod_self[mod_id] = mod_cls
+
+        # 注册触发条件 等待session状态机enabled核验就可以调用
+        if mod_info.get("fit") and "event_trigger" in mod_cls.__dict__:
+            for fit in mod_info["fit"]:
+                direction = fit.get("direction")
+                command_id = fit.get("command_id")
+                if direction is None or command_id is None:
+                    continue
+
+                key = (direction, command_id)
+                buckets = self.mods_lib.event_trigger_map.setdefault(key, [])
+
+                repeat = False
+                for item in buckets:
+                    if item["mod_id"] == mod_id:
+                        repeat = True
+                        break
+
+                if not repeat:
+                    buckets.append({
+                        "mod_id": mod_id,
+                        "data_type": fit.get("data_type"),
+                        "time_slot": fit.get("time_slot"),
+                    })
 
     @staticmethod
     def _get_now():
@@ -161,7 +190,7 @@ class ModManager:
         with self.mod_lock:
             if session_id not in self.session_mods_state:
                 id_runtimes = {}
-                for mod_id, mod_cls in self.mods_lib.items():
+                for mod_id, mod_cls in self.mods_lib.mod_self.items():
                     instance = mod_cls()
                     try:
                         id_runtimes[mod_id] = ModRunTime(mod=instance)
@@ -237,5 +266,6 @@ if __name__ == "__main__":
 
     mod_manager = get_mod_manager(mods_dir_path)
     mod_manager.log_in_mods()
+    print(mod_manager.mods_lib)
 
 
