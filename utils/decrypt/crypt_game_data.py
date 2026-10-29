@@ -17,9 +17,7 @@ class CryptGameDataManager:
             "server_id": None,
         }
 
-        # Mod主动请求使用的ID区间
-        self.next_request_id = 0x80000000
-
+        # 主动动作的 request_id 由 Session.new_request_id() 分配（每会话独立区间）
         # 记录主动请求，后面匹配响应
         self.pending_requests = {}
 
@@ -149,8 +147,8 @@ class CryptGameDataManager:
         )
 
         if request_id is None:
-            request_id = (
-                self._allocate_request_id()
+            raise ValueError(
+                "主动动作必须提供 request_id（由 Session.new_request_id 分配）"
             )
 
         encrypted_body = self._qq_tea_encrypt(
@@ -196,15 +194,6 @@ class CryptGameDataManager:
         }
 
         return result
-
-    def _allocate_request_id(self):
-        request_id = self.next_request_id
-
-        self.next_request_id = (
-            self.next_request_id + 1
-        ) & self.UINT32_MASK
-
-        return request_id
 
     def _qq_tea_encrypt(self, data: bytes):
         key = self.TEA_KEY

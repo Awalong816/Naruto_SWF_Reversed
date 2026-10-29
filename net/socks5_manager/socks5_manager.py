@@ -50,6 +50,14 @@ class Session:
         repr=False,
     )
 
+    def new_request_id(self):
+        if self.extra_action_request_id == 0xFFFFFFFF:
+            self.extra_action_request_id = 0x80000000
+
+        current_id = self.extra_action_request_id
+        self.extra_action_request_id += 1
+        return current_id
+
     def bind_session_id(self):
         try:
             if self.uin is not None and self.server_id is not None:
@@ -500,6 +508,31 @@ class Socks5Manager:
                                         logging.warning(f"添加新会话失败: {err}")
                                         return
                             # TODO mod按需求分发层分发
+                            extra_action_queue = self.mods_manager.session_extra_queue.get(session.session_id)
+                            if extra_action_queue is not None:
+                                while True:
+                                    try:
+                                        action_pack = extra_action_queue.get_nowait()
+                                    except queue.Empty:
+                                        break
+
+                                    try:
+                                        action_bytes = data_packet_manager.build_action_bytes(
+                                            action_pack=action_pack,
+                                            request_id=session.new_request_id(),
+                                            role_id=session.role_id,
+                                            server_id=session.server_id,
+                                            uin=session.uin,
+                                        )
+                                        logging.info(f"action_bytes: {action_bytes}")
+                                    except Exception as err:
+                                        logging.warning(f"会话 {session.session_id} 动作打包失败: {err}")
+                                        continue
+
+                                    action_packet_queue.append({
+                                        "direction": action_pack.direction or "game->server",
+                                        "data": action_bytes,
+                                    })
 
                         for action in action_packet_queue:
                             session.send(action["direction"], action["data"])

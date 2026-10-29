@@ -42,8 +42,22 @@ class DataPacketManager:
             198936,
         ]
 
-    def build_action_packet(self, action_spec: dict):
-        pass
+    def build_action_bytes(self, action_pack: DataPack, request_id: int, role_id: int, server_id: int, uin: int) -> bytes:
+        """
+        mod产出的DataPack加密后，重新统计长度，组装request_id,加头，得到可发送的完整动作数据
+        :param action_pack: mod产出的动作包，至少包含 direction、command_id 与 value_data
+        :return: 36字节头 + TEA密文
+        """
+        spec = {
+            "command_id": action_pack.command_id,
+            "body": bytes(action_pack.value_data or b""),
+            "request_id": request_id,
+            "role_id": role_id,
+            "server_id": server_id,
+            "uin": uin,
+        }
+        result = self.decrypt_manager.encrypt_action_spec(spec)
+        return result["data"]
 
     def completed_data_stream(self, direction: str, data: bytes):
         """
@@ -116,6 +130,7 @@ class DataPacketManager:
                 if debug:
                     self._log_report(data_packet,
                                      aim_id=[198935,198936],
+                                     dismiss_id=[250882],
                                      )
                 data_packets.append(data_packet)
             return data_packets
