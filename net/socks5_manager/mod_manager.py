@@ -20,7 +20,7 @@ class BaseMod:
         # 可变
         self.enabled: bool = False
 
-    def _enabled_init(self, now=None, **kwargs) -> list[dict]:
+    def _enabled_init(self, now=None, **kwargs) -> list[DataPack]:
         """
         mod在启用时开始需要发送的动作，可以为空
         :return:
@@ -49,7 +49,7 @@ class BaseMod:
         """
         ...
 
-    def start(self, now=None, **kwargs):
+    def start(self, now=None, **kwargs) -> list[DataPack]:
         ...
 
     def stop(self, now=None, **kwargs):
@@ -229,49 +229,51 @@ class ModManager:
 
     def start_mod_in_session(self, session_id, mod_id):
         try:
+            with self.mod_lock:
+                session_table = self.session_mods_state.get(session_id)
+                extra_action_queue = self.session_extra_queue.get(session_id)
+                if not session_table:
+                    raise ValueError(f"session {session_id} 没有注册状态机或状态机为空表")
+                runtime = session_table.get(mod_id)
+                if not runtime:
+                    raise ValueError(f"mod <{mod_id}> 状态无法查询")
+
+            mod_instance = runtime.instance
             now = self._get_now()
-            session_table = self.session_mods_state[session_id]
-            mod_instance = session_table[mod_id].instance
             result = mod_instance.start(now=now)
-            session_table[mod_id].running_log.append(f"{now.strftime('%Y-%m-%d %H:%M:%S')}:\n<{self.session_mods_state[session_id][mod_id].instance.MOD_INFO.get('name')}> 开始运行")
-            # TODO 读动作内容和二进制格式压缩成body加头打包成DataPack发送给服务器
+            session_table[mod_id].running_log.append(f"{now.strftime('%Y-%m-%d %H:%M:%S')}:\n<{runtime.instance.MOD_INFO.get('name')}> 开始运行")
+            # 读动作内容包成DataPack发送给服务器
+            if result:
+                for action_spec in result:
+                    match action_spec.need_type_reverse:
+                        case "protobuf":
+                            action_spec.value_data = self.type_reader.reverse_body(action_spec.value_data, "protobuf")
+                        case _:
+                            pass
+                    extra_action_queue.put(action_spec) # 最后交给data_packet_manager加密加头
             print(f"action result: {result}")
         except Exception as err:
             raise err
 
     def stop_mod_in_session(self, session_id, mod_id):
         try:
+            with self.mod_lock:
+                session_table = self.session_mods_state.get(session_id)
+                if not session_table:
+                    raise ValueError(f"session {session_id} 没有注册状态机或状态机为空表")
+                runtime = session_table.get(mod_id)
+                if not runtime:
+                    raise ValueError(f"mod <{mod_id}> 状态无法查询")
+
             now = self._get_now()
-            session_table = self.session_mods_state[session_id]
-            mod_instance = session_table[mod_id].instance
+            mod_instance = runtime.instance
             mod_instance.stop()
-            session_table[session_id][mod_id].running_log.append(f"{now.strftime('%Y-%m-%d %H:%M:%S')}:\n<{self.session_mods_state[session_id][mod_id].instance.MOD_INFO.get('name')}> 停止运行")
+            runtime.running_log.append(f"{now.strftime('%Y-%m-%d %H:%M:%S')}:\n<{runtime.instance.MOD_INFO.get('name')}> 停止运行")
         except Exception as err:
             raise err
 
     def event_trigger(self, session_id, data_packets: list[DataPack]):
         pass
-        # for data_packet in data_packets:
-        #     key = tuple((data_packet.direction, data_packet.command_id))
-        #     if key in self.mods_lib.event_trigger_map:
-        #         for _mod in self.mods_lib.event_trigger_map[key]:
-        #             mod_id = _mod.mod_id
-        #             if self.session_mods_state[session_id][mod_id].is_enabled():
-        #                 mod_instance = self.session_mods_state[session_id][_mod].instance
-        #                 data_type = _mod["data_type"]
-        #                 match data_type:
-        #                     case "protobuf":
-        #                         context_data = self.type_reader.read_bytes(data_packet.value_data[36:], "protobuf")
-        #                     case _:
-        #                         context_data = data_packet.value_data[36:]
-        #                 # noinspection PyUnboundLocalVariable
-        #                 action_context = mod_instance.event_trigger(
-        #                     data=context_data,
-        #                     now=self._get_now(),
-        #                 )
-        #                 # TODO: 修改后重新组装头部
-        #             else:
-        #                 continue
 
     def timer_trigger(self, session_id):
         pass

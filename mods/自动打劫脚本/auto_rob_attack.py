@@ -228,6 +228,21 @@ class AutoRobAttackMod(BaseMod):
                 return True
         return False
 
+    # 组装请求列表命令
+    @staticmethod
+    def send_198935_action() -> DataPack:
+        # TODO: 做成DataPack交给data_packet_manager转回bytes
+        action_spec = DataPack(
+            # mod侧负责
+            direction="game->server",
+            direction_type=1,
+            command_id=198935,
+            count=0,
+            value_data=b'',
+            need_type_reverse=None,
+        )
+        return action_spec
+
     def _apply_schema(self, fields: list | dict, schema: dict = ROB_LIST_RESPONSE_SCHEMA):
         """
         把 _read_protobuf() 得到的数字字段列表，
@@ -320,7 +335,6 @@ class AutoRobAttackMod(BaseMod):
                     encoding="utf-8"
                 )
 
-
     def load_config(self, path=None):
         if not path:
             dir_path = os.path.dirname(os.path.abspath(__file__))
@@ -345,28 +359,27 @@ class AutoRobAttackMod(BaseMod):
         # 198935 使用protobuf二进制数据格式
         pass
 
-    # 组装请求列表命令
-    def send_198935_action(self):
-        # TODO: 做成DataPack交给data_packet_manager转回bytes
-        pass
-
     # ============= 继承方法 =============
-    def _enabled_init(self, now=None, **kwargs):
+    def _enabled_init(self, now=None, **kwargs) -> list[DataPack]:
         """启用时的初始化：now 由管理器统一传入（datetime），缺省才回落本机时间"""
+        # 时间限制
         time_slots = self._get_time_slots()
         if not time_slots:
             raise ValueError("fit 缺失字段 'time_slots'")
 
         if time_slots and (not self._time_pass(time_slots, now=now)):
             raise ValueError("不在可运行的时间段内")
-        # 本mod没有开场需要发送的动作
-        return []
+        # 启动动作
+        action_specs = [
+            self.send_198935_action(),
+        ]
+        return action_specs
 
-    def start(self, now=None, **kwargs):
+    def start(self, now=None, **kwargs) -> list[DataPack]:
         try:
             self.enabled = True
-            actions = self._enabled_init(now=now)
-            return actions
+            action_specs = self._enabled_init(now=now)
+            return action_specs
         except Exception as err:
             self.enabled = False
             raise err
@@ -415,6 +428,10 @@ class AutoRobAttackMod(BaseMod):
 
         print("没有找到")
         # TODO: 没有找到，继续循环出发198935
+        action_specs = [
+            self.send_198935_action()
+        ]
+        return action_specs
 
 
 SERVER_MOD_CLASS = AutoRobAttackMod
@@ -431,4 +448,4 @@ def test(data: list | dict):
 if __name__ == "__main__":
     test_data = [{'field': 1, 'wire_type': 2, 'length': 11, 'value': [{'field': 1, 'wire_type': 0, 'value': 0}, {'field': 2, 'wire_type': 2, 'length': 7, 'value': 'success'}]}, {'field': 2, 'wire_type': 2, 'length': 83, 'value': [{'field': 1, 'wire_type': 2, 'length': 77, 'value': [{'field': 1, 'wire_type': 2, 'length': 10, 'value': [{'field': 1, 'wire_type': 0, 'value': 120234598}, {'field': 2, 'wire_type': 0, 'value': 0}, {'field': 3, 'wire_type': 0, 'value': 507}]}, {'field': 2, 'wire_type': 2, 'length': 12, 'value': '忘川河神'}, {'field': 3, 'wire_type': 0, 'value': 111}, {'field': 4, 'wire_type': 0, 'value': 10000201}, {'field': 5, 'wire_type': 0, 'value': 10000201}, {'field': 6, 'wire_type': 2, 'length': 24, 'value': [{'field': 1, 'wire_type': 0, 'value': 1}, {'field': 2, 'wire_type': 0, 'value': 0}, {'field': 3, 'wire_type': 0, 'value': 0}, {'field': 4, 'wire_type': 0, 'value': 0}, {'field': 5, 'wire_type': 0, 'value': 1}, {'field': 6, 'wire_type': 0, 'value': 0}, {'field': 7, 'wire_type': 0, 'value': 0}, {'field': 8, 'wire_type': 0, 'value': 0}, {'field': 9, 'wire_type': 0, 'value': 7}, {'field': 10, 'wire_type': 0, 'value': 0}, {'field': 11, 'wire_type': 0, 'value': 0}, {'field': 12, 'wire_type': 0, 'value': 0}]}, {'field': 7, 'wire_type': 0, 'value': 3}, {'field': 8, 'wire_type': 0, 'value': 3620566}, {'field': 9, 'wire_type': 0, 'value': 4}, {'field': 10, 'wire_type': 0, 'value': 0}, {'field': 11, 'wire_type': 0, 'value': 0}]}, {'field': 2, 'wire_type': 0, 'value': 600045}]}, {'field': 2, 'wire_type': 2, 'length': 86, 'value': [{'field': 1, 'wire_type': 2, 'length': 80, 'value': [{'field': 1, 'wire_type': 2, 'length': 11, 'value': [{'field': 1, 'wire_type': 0, 'value': 1353846934}, {'field': 2, 'wire_type': 0, 'value': 0}, {'field': 3, 'wire_type': 0, 'value': 577}]}, {'field': 2, 'wire_type': 2, 'length': 12, 'value': '辉夜那美'}, {'field': 3, 'wire_type': 0, 'value': 107}, {'field': 4, 'wire_type': 0, 'value': 10000101}, {'field': 5, 'wire_type': 0, 'value': 10000101}, {'field': 6, 'wire_type': 2, 'length': 24, 'value': [{'field': 1, 'wire_type': 0, 'value': 1}, {'field': 2, 'wire_type': 0, 'value': 0}, {'field': 3, 'wire_type': 0, 'value': 0}, {'field': 4, 'wire_type': 0, 'value': 0}, {'field': 5, 'wire_type': 0, 'value': 0}, {'field': 6, 'wire_type': 0, 'value': 0}, {'field': 7, 'wire_type': 0, 'value': 0}, {'field': 8, 'wire_type': 0, 'value': 0}, {'field': 9, 'wire_type': 0, 'value': 1}, {'field': 10, 'wire_type': 0, 'value': 0}, {'field': 11, 'wire_type': 0, 'value': 0}, {'field': 12, 'wire_type': 0, 'value': 0}]}, {'field': 7, 'wire_type': 0, 'value': 2}, {'field': 8, 'wire_type': 0, 'value': 1380084}, {'field': 9, 'wire_type': 0, 'value': 2}, {'field': 10, 'wire_type': 0, 'value': 12}, {'field': 11, 'wire_type': 0, 'value': 26204602}]}, {'field': 2, 'wire_type': 0, 'value': 600235}]}, {'field': 2, 'wire_type': 2, 'length': 86, 'value': [{'field': 1, 'wire_type': 2, 'length': 80, 'value': [{'field': 1, 'wire_type': 2, 'length': 11, 'value': [{'field': 1, 'wire_type': 0, 'value': 1289654730}, {'field': 2, 'wire_type': 0, 'value': 0}, {'field': 3, 'wire_type': 0, 'value': 568}]}, {'field': 2, 'wire_type': 2, 'length': 12, 'value': '龙崎雷夫'}, {'field': 3, 'wire_type': 0, 'value': 104}, {'field': 4, 'wire_type': 0, 'value': 10000401}, {'field': 5, 'wire_type': 0, 'value': 10000401}, {'field': 6, 'wire_type': 2, 'length': 24, 'value': [{'field': 1, 'wire_type': 0, 'value': 1}, {'field': 2, 'wire_type': 0, 'value': 0}, {'field': 3, 'wire_type': 0, 'value': 0}, {'field': 4, 'wire_type': 0, 'value': 0}, {'field': 5, 'wire_type': 0, 'value': 1}, {'field': 6, 'wire_type': 0, 'value': 0}, {'field': 7, 'wire_type': 0, 'value': 0}, {'field': 8, 'wire_type': 0, 'value': 0}, {'field': 9, 'wire_type': 0, 'value': 2}, {'field': 10, 'wire_type': 0, 'value': 0}, {'field': 11, 'wire_type': 0, 'value': 0}, {'field': 12, 'wire_type': 0, 'value': 0}]}, {'field': 7, 'wire_type': 0, 'value': 0}, {'field': 8, 'wire_type': 0, 'value': 1984260}, {'field': 9, 'wire_type': 0, 'value': 8}, {'field': 10, 'wire_type': 0, 'value': 12}, {'field': 11, 'wire_type': 0, 'value': 26201408}]}, {'field': 2, 'wire_type': 0, 'value': 600075}]}, {'field': 2, 'wire_type': 2, 'length': 90, 'value': [{'field': 1, 'wire_type': 2, 'length': 84, 'value': [{'field': 1, 'wire_type': 2, 'length': 11, 'value': [{'field': 1, 'wire_type': 0, 'value': 1603788947}, {'field': 2, 'wire_type': 0, 'value': 0}, {'field': 3, 'wire_type': 0, 'value': 570}]}, {'field': 2, 'wire_type': 2, 'length': 15, 'value': '醉╭ァ西凨'}, {'field': 3, 'wire_type': 0, 'value': 112}, {'field': 4, 'wire_type': 0, 'value': 10000201}, {'field': 5, 'wire_type': 0, 'value': 10000201}, {'field': 6, 'wire_type': 2, 'length': 24, 'value': [{'field': 1, 'wire_type': 0, 'value': 0}, {'field': 2, 'wire_type': 0, 'value': 0}, {'field': 3, 'wire_type': 0, 'value': 0}, {'field': 4, 'wire_type': 0, 'value': 0}, {'field': 5, 'wire_type': 0, 'value': 0}, {'field': 6, 'wire_type': 0, 'value': 0}, {'field': 7, 'wire_type': 0, 'value': 0}, {'field': 8, 'wire_type': 0, 'value': 0}, {'field': 9, 'wire_type': 0, 'value': 1}, {'field': 10, 'wire_type': 0, 'value': 0}, {'field': 11, 'wire_type': 0, 'value': 0}, {'field': 12, 'wire_type': 0, 'value': 0}]}, {'field': 7, 'wire_type': 0, 'value': 0}, {'field': 8, 'wire_type': 0, 'value': 2425912}, {'field': 9, 'wire_type': 0, 'value': 4}, {'field': 10, 'wire_type': 0, 'value': 12}, {'field': 11, 'wire_type': 0, 'value': 26213804}]}, {'field': 2, 'wire_type': 0, 'value': 600045}]}, {'field': 2, 'wire_type': 2, 'length': 87, 'value': [{'field': 1, 'wire_type': 2, 'length': 81, 'value': [{'field': 1, 'wire_type': 2, 'length': 11, 'value': [{'field': 1, 'wire_type': 0, 'value': 308235354}, {'field': 2, 'wire_type': 0, 'value': 0}, {'field': 3, 'wire_type': 0, 'value': 552}]}, {'field': 2, 'wire_type': 2, 'length': 12, 'value': '终ミ八云'}, {'field': 3, 'wire_type': 0, 'value': 108}, {'field': 4, 'wire_type': 0, 'value': 10000201}, {'field': 5, 'wire_type': 0, 'value': 10000201}, {'field': 6, 'wire_type': 2, 'length': 24, 'value': [{'field': 1, 'wire_type': 0, 'value': 1}, {'field': 2, 'wire_type': 0, 'value': 0}, {'field': 3, 'wire_type': 0, 'value': 0}, {'field': 4, 'wire_type': 0, 'value': 0}, {'field': 5, 'wire_type': 0, 'value': 9}, {'field': 6, 'wire_type': 0, 'value': 0}, {'field': 7, 'wire_type': 0, 'value': 0}, {'field': 8, 'wire_type': 0, 'value': 0}, {'field': 9, 'wire_type': 0, 'value': 7}, {'field': 10, 'wire_type': 0, 'value': 0}, {'field': 11, 'wire_type': 0, 'value': 0}, {'field': 12, 'wire_type': 0, 'value': 0}]}, {'field': 7, 'wire_type': 0, 'value': 0}, {'field': 8, 'wire_type': 0, 'value': 8186030}, {'field': 9, 'wire_type': 0, 'value': 4}, {'field': 10, 'wire_type': 0, 'value': 0}, {'field': 11, 'wire_type': 0, 'value': 26211204}]}, {'field': 2, 'wire_type': 0, 'value': 600225}]}, {'field': 3, 'wire_type': 2, 'length': 8, 'value': [{'field': 1, 'wire_type': 0, 'value': 3}, {'field': 2, 'wire_type': 0, 'value': 2}, {'field': 3, 'wire_type': 0, 'value': 0}, {'field': 4, 'wire_type': 0, 'value': 10}]}]
     test_result = test(test_data)
-    print(json.dumps(test_result, ensure_ascii=False, indent=2))
+    print(test_result)

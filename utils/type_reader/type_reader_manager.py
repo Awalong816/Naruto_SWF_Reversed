@@ -13,6 +13,10 @@ class TypeReaderManager:
         reader = self.readers[method]
         return reader.read_bytes(_bytes)
 
+    def reverse_body(self, data, method):
+        reader = self.readers[method]
+        return reader.reverse_body(data)
+
 
 def get_type_reader_manager():
     return TypeReaderManager()

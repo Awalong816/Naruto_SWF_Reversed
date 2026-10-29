@@ -27,7 +27,7 @@ class DecryptManager:
 
     def decrypt_data(self, data: bytes):
         result = self.DataCryptServer.decrypt(data)
-        return result["all_data"]
+        return result["body"] # 弃掉头部，因为不会复用，其他信息都在datapack的其他成员中
 
     def encrypt_action_spec(self, action_spec: dict):
         pass

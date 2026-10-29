@@ -1,4 +1,5 @@
 import json
+import struct
 
 
 class ProtobufReader:
@@ -113,8 +114,212 @@ class ProtobufReader:
 
         return fields
 
-    def _reverse_protobuf(self, body):
-        pass
+    @staticmethod
+    def _encode_varint(value: int) -> bytes:
+        # 负数按64位补码编码，和protobuf的int32/int64一致
+        if value < 0:
+            value += 1 << 64
+
+        buffer = bytearray()
+
+        while True:
+            chunk = value & 0x7F
+            value >>= 7
+
+            if value:
+                buffer.append(chunk | 0x80)
+            else:
+                buffer.append(chunk)
+                return bytes(buffer)
+
+    def _encode_field(self, field_number: int, value, depth: int) -> bytes:
+        # bool 是 int 的子类，必须先判断
+        if isinstance(value, bool):
+            return (
+                self._encode_varint((field_number << 3) | 0)
+                + self._encode_varint(int(value))
+            )
+
+        if isinstance(value, int):
+            return (
+                self._encode_varint((field_number << 3) | 0)
+                + self._encode_varint(value)
+            )
+
+        if isinstance(value, float):
+            # double 按 fixed64 编码
+            return (
+                self._encode_varint((field_number << 3) | 1)
+                + struct.pack("<d", value)
+            )
+
+        if isinstance(value, str):
+            payload = value.encode("utf-8")
+        elif isinstance(value, (bytes, bytearray)):
+            payload = bytes(value)
+        elif isinstance(value, dict):
+            payload = self._reverse_protobuf(value, depth + 1)
+        else:
+            raise TypeError(f"不支持的字段值类型: {type(value)!r}")
+
+        return (
+            self._encode_varint((field_number << 3) | 2)
+            + self._encode_varint(len(payload))
+            + payload
+        )
+
+    @staticmethod
+    def _reverse_fixed(item: dict, size: int) -> bytes:
+        value = item.get("value")
+
+        if isinstance(value, int) and not isinstance(value, bool):
+            try:
+                return value.to_bytes(size, "little", signed=False)
+            except OverflowError:
+                raise ValueError(
+                    f"fixed{size * 8}数值超出范围: {value}"
+                )
+
+        hex_text = item.get("hex")
+
+        if hex_text:
+            raw = bytes.fromhex(hex_text.replace(" ", ""))
+
+            if len(raw) != size:
+                raise ValueError(
+                    f"fixed{size * 8}长度异常: {len(raw)}"
+                )
+
+            return raw
+
+        raise ValueError(f"fixed{size * 8}缺少value/hex")
+
+    def _reverse_length_delimited(self, item: dict, depth: int) -> bytes:
+        value = item.get("value")
+
+        if isinstance(value, str):
+            return value.encode("utf-8")
+
+        if isinstance(value, (bytes, bytearray)):
+            return bytes(value)
+
+        if isinstance(value, list):
+            return self._reverse_protobuf(value, depth + 1)
+
+        hex_text = item.get("hex")
+
+        if hex_text is not None:
+            return bytes.fromhex(hex_text.replace(" ", ""))
+
+        raise ValueError("length-delimited字段缺少value/hex")
+
+    def _reverse_field_table(self, fields: list, depth: int) -> bytes:
+        """
+        _read_protobuf() 产出的字段表 -> 二进制。
+        """
+        buffer = bytearray()
+
+        for item in fields:
+            if (
+                not isinstance(item, dict)
+                or "field" not in item
+                or "wire_type" not in item
+            ):
+                raise TypeError(f"字段表元素格式错误: {item!r}")
+
+            field_number = item["field"]
+            wire_type = item["wire_type"]
+
+            if isinstance(field_number, bool) or not isinstance(field_number, int):
+                raise TypeError(f"字段号必须是int: {field_number!r}")
+
+            if field_number <= 0 or field_number > 0x1FFFFFFF:
+                raise ValueError(f"Protobuf字段号超出范围: {field_number}")
+
+            if wire_type not in (0, 1, 2, 5):
+                raise ValueError(f"暂不支持wire_type={wire_type}")
+
+            buffer += self._encode_varint(
+                (field_number << 3) | wire_type
+            )
+
+            if wire_type == 0:
+                value = item.get("value", 0)
+
+                if isinstance(value, bool):
+                    value = int(value)
+
+                if not isinstance(value, int):
+                    raise ValueError(
+                        f"varint字段缺少整数value: {item!r}"
+                    )
+
+                buffer += self._encode_varint(value)
+
+            elif wire_type == 1:
+                buffer += self._reverse_fixed(item, 8)
+
+            elif wire_type == 2:
+                payload = self._reverse_length_delimited(item, depth)
+                buffer += self._encode_varint(len(payload))
+                buffer += payload
+
+            else:
+                buffer += self._reverse_fixed(item, 4)
+
+        return bytes(buffer)
+
+    def _reverse_dict(self, data: dict, depth: int) -> bytes:
+        buffer = bytearray()
+
+        for field_number, value in data.items():
+            if isinstance(field_number, bool) or not isinstance(field_number, int):
+                raise TypeError(f"字段号必须是int: {field_number!r}")
+
+            if field_number <= 0 or field_number > 0x1FFFFFFF:
+                raise ValueError(f"Protobuf字段号超出范围: {field_number}")
+
+            values = value if isinstance(value, list) else [value]
+
+            for item in values:
+                if item is None:
+                    continue
+
+                buffer += self._encode_field(
+                    field_number,
+                    item,
+                    depth,
+                )
+
+        return bytes(buffer)
+
+    def _reverse_protobuf(self, data, depth: int = 0) -> bytes:
+        """
+        dict -> protobuf 二进制，只做语法层，不做字段名映射。
+        支持两种入参：
+            1. dict：键是字段号(int)，值是字段值
+               int / bool  -> varint
+               float       -> double(fixed64)
+               str         -> UTF-8 字符串
+               bytes       -> 原始字节
+               dict        -> 嵌套 message
+               list        -> repeated，每个元素用同一字段号重复编码
+               None        -> 跳过，等同字段缺席
+            2. list：_read_protobuf() 产出的字段表，
+               wire_type 直接来自表项，可字节级还原原始数据
+        """
+        if depth > 5:
+            raise ValueError("Protobuf嵌套层级过深")
+
+        if isinstance(data, dict):
+            return self._reverse_dict(data, depth)
+
+        if isinstance(data, list):
+            return self._reverse_field_table(data, depth)
+
+        raise TypeError(
+            "_reverse_protobuf 只接受 dict 或 _read_protobuf 产出的字段表list"
+        )
 
     def read_bytes(self, body: bytes) -> str:
         """
@@ -129,12 +334,24 @@ class ProtobufReader:
     def reverse_body(self, body):
         """
         body必须是
-        1. 符合结构的dict
+        1. 符合结构的dict | list[dict]
         :param body:
         :return:
         """
-        pass
+        result = self._reverse_protobuf(body)
+
+        return result
 
 
 def _get_protobuf_reader():
     return ProtobufReader()
+
+
+if __name__ == "__main__":
+    instance = _get_protobuf_reader()
+    origin_bytes = b'\t\x01\x01\xe0\x00\x03\t\x17\x00\x00\x07$\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00\x001\xf13\xa6\x00\x00\x02\x1d\x00\x00\x00\x00\n\x0b\x08\x00\x12\x07success\x12S\nM\n\n\x08\xe6\xc4\xaa9\x10\x00\x18\xfb\x03\x12\x0c\xe5\xbf\x98\xe5\xb7\x9d\xe6\xb2\xb3\xe7\xa5\x9e\x18o \xc9\xae\xe2\x04(\xc9\xae\xe2\x042\x18\x08\x01\x10\x00\x18\x00 \x00(\x010\x008\x00@\x00H\x07P\x00X\x00`\x008\x03@\xd6\xfd\xdc\x01H\x04P\x00X\x00\x10\xed\xcf$\x12V\nP\n\x0b\x08\x96\xa1\xc8\x85\x05\x10\x00\x18\xc1\x04\x12\x0c\xe8\xbe\x89\xe5\xa4\x9c\xe9\x82\xa3\xe7\xbe\x8e\x18k \xe5\xad\xe2\x04(\xe5\xad\xe2\x042\x18\x08\x01\x10\x00\x18\x00 \x00(\x000\x008\x00@\x00H\x01P\x00X\x00`\x008\x02@\xf4\x9dTH\x02P\x0cX\xba\xb3\xbf\x0c\x10\xab\xd1$\x12V\nP\n\x0b\x08\xca\xa3\xfa\xe6\x04\x10\x00\x18\xb8\x04\x12\x0c\xe9\xbe\x99\xe5\xb4\x8e\xe9\x9b\xb7\xe5\xa4\xab\x18h \x91\xb0\xe2\x04(\x91\xb0\xe2\x042\x18\x08\x01\x10\x00\x18\x00 \x00(\x010\x008\x00@\x00H\x02P\x00X\x00`\x008\x00@\x84\x8eyH\x08P\x0cX\xc0\x9a\xbf\x0c\x10\x8b\xd0$\x12Z\nT\n\x0b\x08\x93\xc1\xdf\xfc\x05\x10\x00\x18\xba\x04\x12\x0f\xe9\x86\x89\xe2\x95\xad\xe3\x82\xa1\xe8\xa5\xbf\xe5\x87\xa8\x18p \xc9\xae\xe2\x04(\xc9\xae\xe2\x042\x18\x08\x00\x10\x00\x18\x00 \x00(\x000\x008\x00@\x00H\x01P\x00X\x00`\x008\x00@\xb8\x88\x94\x01H\x04P\x0cX\xac\xfb\xbf\x0c\x10\xed\xcf$\x12W\nQ\n\x0b\x08\xda\x98\xfd\x92\x01\x10\x00\x18\xa8\x04\x12\x0c\xe7\xbb\x88\xe3\x83\x9f\xe5\x85\xab\xe4\xba\x91\x18l \xc9\xae\xe2\x04(\xc9\xae\xe2\x042\x18\x08\x01\x10\x00\x18\x00 \x00(\t0\x008\x00@\x00H\x07P\x00X\x00`\x008\x00@\xae\xd1\xf3\x03H\x04P\x00X\x84\xe7\xbf\x0c\x10\xa1\xd1$\x1a\x08\x08\x03\x10\x02\x18\x00 \n'[36:]
+    fields = instance.read_bytes(origin_bytes)
+    # print(fields)
+    reversed_bytes = instance.reverse_body(fields)
+    if origin_bytes == reversed_bytes:
+        print("过")

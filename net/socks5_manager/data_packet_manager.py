@@ -1,7 +1,7 @@
 import logging
-from datetime import datetime
 from typing import Any
-from dataclasses import dataclass
+from datetime import datetime
+from dataclasses import dataclass, field
 
 from utils import get_decrypt_manager
 
@@ -11,16 +11,17 @@ logging.basicConfig(level=logging.INFO)
 class DataPack:
     direction: str
     direction_type: int
-    context: str | dict
-    uin: int # 当前账号
-    role_id: int # 当前角色
-    server_id: int # 当前服务器
-    time_stamp: str
     command_id: int
     count: int
     value_data: bytes
-    is_decrypted: bool
-    request_id: int | None
+    time_stamp: str | None = field(default=None)
+    context: str | dict | None = field(default=None)
+    uin: int | None = field(default=None) # 当前账号
+    role_id: int | None = field(default=None) # 当前角色
+    server_id: int | None = field(default=None) # 当前服务器
+    is_decrypted: bool | None = field(default=None) # 是否已经TEA解密
+    need_type_reverse: str | None = field(default=None) # 需要逆向二进制格式化的方式
+    request_id: int | None = field(default=None)
 
     def update_data(self, data: bytes):
         self.value_data = data
