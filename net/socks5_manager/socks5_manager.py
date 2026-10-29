@@ -40,9 +40,14 @@ class Session:
 
     client_ip: int = 0
     timeout: float = 0.0
-    # TODO request_id在额外动作时使用高半区位置, 容易被反追踪暴露, 尝试是否可行:服务器是否检察相连的请求是否连号
-    extra_action_request_id: int = 0x80000000 # 每个会话额外任务id与其他会话隔离
-    extra_action_request_id_range: tuple = (0x80000000, 0xFFFFFFFF)
+
+    # 代理自管的请求id序列。客户端源码里 id 从 1 起步、每次发包 +1（m_protocolIndex），
+    # 服务端要求相连请求必须连续，所以额外动作不能再自己开一个高位号段（0x80000000 会被直接断开）。
+    # 这里由代理统一发号：客户端每个出站包都改写成这里的下一个号，服务端回包再按 out_index_map 还原成客户端原本的号；
+    # 额外动作也从同一序列取号，服务端看到的 id 始终连续唯一，客户端侧则完全无感。
+    proxy_current_id: int = 0 # 0 表示还没发过号，第一次分配得到 1（与客户端起步值一致）
+    out_index_map: dict = field(default_factory=dict, init=False, repr=False) # (command_id, 代理id) -> 客户端原始id
+    injected: dict = field(default_factory=dict, init=False, repr=False) # 代理id -> 注入动作 DataPack，用于识别回包
 
     closed: th.Event = field(
         default_factory=th.Event,
@@ -50,13 +55,13 @@ class Session:
         repr=False,
     )
 
-    def new_request_id(self):
-        if self.extra_action_request_id == 0xFFFFFFFF:
-            self.extra_action_request_id = 0x80000000
-
-        current_id = self.extra_action_request_id
-        self.extra_action_request_id += 1
-        return current_id
+    def new_proxy_id(self):
+        # 与客户端一致：0xFFFFFFFF 回绕到 1
+        if self.proxy_current_id >= 0xFFFFFFFF:
+            self.proxy_current_id = 1
+        else:
+            self.proxy_current_id += 1
+        return self.proxy_current_id
 
     def bind_session_id(self):
         try:
@@ -471,18 +476,23 @@ class Socks5Manager:
 
                         if sock is src_pipe:
                             original_direction = "game->server"
-                            action_packet_queue.append({
-                                "direction": original_direction,
-                                "data": event_data,
-                            })
                         elif sock is tag_pipe:
                             original_direction = "server->game"
-                            action_packet_queue.append({
-                                "direction": original_direction,
-                                "data": event_data,
-                            })
                         else:
                             continue
+
+                        # 转发前改写请求 id：客户端号段 <-> 代理号段互相翻译，注入动作也共用一个连续序列
+                        # **来去的功能不相同，客户端过去是改写，服务器响应是改回**
+                        forward_data = data_packet_manager.rewrite_forward(
+                            session=session,
+                            direction=original_direction, # 路由关键在方向
+                            data=event_data,
+                        )
+                        if forward_data:
+                            action_packet_queue.append({
+                                "direction": original_direction,
+                                "data": forward_data,
+                            })
 
                         if data_packet_manager is not None:  # 不是一次发送对应一个完整包，是一对n包括0
 
@@ -517,18 +527,22 @@ class Socks5Manager:
                                         break
 
                                     try:
+                                        proxy_id = session.new_proxy_id()
                                         action_bytes = data_packet_manager.build_action_bytes(
                                             action_pack=action_pack,
-                                            request_id=session.new_request_id(),
+                                            request_id=proxy_id,
                                             role_id=session.role_id,
                                             server_id=session.server_id,
                                             uin=session.uin,
                                         )
-                                        logging.info(f"action_bytes: {action_bytes}")
+                                        # 登记注入号，回包到达时据此识别（吞掉或按需透传给客户端）
+                                        session.injected[proxy_id] = action_pack
+                                        if self.debug:
+                                            logging.info(f"action_bytes: {action_bytes}")
                                     except Exception as err:
                                         logging.warning(f"会话 {session.session_id} 动作打包失败: {err}")
                                         continue
-
+                                    # 返回给服务器时模拟主动推送路线，flash依然会做出反应，例如:组队请求、挑战请求
                                     action_packet_queue.append({
                                         "direction": action_pack.direction or "game->server",
                                         "data": action_bytes,

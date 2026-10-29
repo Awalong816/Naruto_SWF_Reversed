@@ -22,6 +22,7 @@ class DataPack:
     is_decrypted: bool | None = field(default=None) # 是否已经TEA解密
     need_type_reverse: str | None = field(default=None) # 需要逆向二进制格式化的方式
     request_id: int | None = field(default=None)
+    forward_response: bool = field(default=False) # 注入动作的回包是否透传给客户端（True 才会触发客户端 UI 效果）
 
     def update_data(self, data: bytes):
         self.value_data = data
@@ -32,6 +33,11 @@ class DataPacketManager:
         self.header_size = 36
         self.magic = b'\x09\x01'
         self.cache = {
+            "game->server": bytearray(),
+            "server->game": bytearray(),
+        }
+        # 转发改写专用缓冲，与 parse_data 的分析缓冲互相独立，避免两边抢同一份流
+        self.forward_cache = {
             "game->server": bytearray(),
             "server->game": bytearray(),
         }
@@ -58,6 +64,56 @@ class DataPacketManager:
         }
         result = self.decrypt_manager.encrypt_action_spec(spec)
         return result["data"]
+
+    def rewrite_forward(self, session, direction: str, data: bytes) -> bytes:
+        """
+        转发前把整段数据切成完整包，改写包头里的请求 id 后再拼回去
+        - game->server：客户端原始 id -> 会话代理 id，并登记还原映射
+        - server->game：代理 id -> 客户端原始 id；属于注入动作的回包按 forward_response 决定透传还是吞掉
+        没走完的半包留在缓冲里等下一段数据；非协议数据（如 <policy-file-request/>）原样放行
+        :param session: 当前会话，持有发号器与两个映射表
+        :param direction: 转发方向
+        :param data: 本次从 socket 读到的原始分片
+        :return: 改写后可转发给对端的字节流（可能比入参短，因为半包被压后）
+        """
+        buffer = self.forward_cache[direction]
+        buffer.extend(data)
+        out = bytearray()
+
+        while len(buffer) >= 2:
+            if buffer[:2] != self.magic:
+                # 非本协议数据，原样放行，避免握手/短包被卡死在缓冲里
+                out.extend(buffer)
+                buffer.clear()
+                break
+            if len(buffer) < self.header_size:
+                break
+            count = int.from_bytes(buffer[2:4], "big")
+            total = self.header_size + count
+            if len(buffer) < total:
+                break
+
+            frame = bytearray(buffer[:total])
+            del buffer[:total]
+            command_id = int.from_bytes(frame[4:8], "big")
+            request_id = int.from_bytes(frame[8:12], "big")
+
+            if direction == "game->server":
+                proxy_id = session.new_proxy_id()
+                session.out_index_map[(command_id, proxy_id)] = request_id
+                frame[8:12] = proxy_id.to_bytes(4, "big")
+            else:
+                if (command_id, request_id) in session.out_index_map:
+                    # 客户端自己请求的回包，还原成客户端原本的号
+                    frame[8:12] = session.out_index_map.pop((command_id, request_id)).to_bytes(4, "big")
+                elif request_id in session.injected:
+                    action_pack = session.injected.pop(request_id)
+                    if not action_pack.forward_response:
+                        continue # 吞掉，客户端不会看到这条回包
+
+            out.extend(frame)
+
+        return bytes(out)
 
     def completed_data_stream(self, direction: str, data: bytes):
         """

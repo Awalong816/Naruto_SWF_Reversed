@@ -17,7 +17,7 @@ class CryptGameDataManager:
             "server_id": None,
         }
 
-        # 主动动作的 request_id 由 Session.new_request_id() 分配（每会话独立区间）
+        # 主动动作的 request_id 由 Session.new_proxy_id() 从代理统一序列分配
         # 记录主动请求，后面匹配响应
         self.pending_requests = {}
 
@@ -148,7 +148,7 @@ class CryptGameDataManager:
 
         if request_id is None:
             raise ValueError(
-                "主动动作必须提供 request_id（由 Session.new_request_id 分配）"
+                "主动动作必须提供 request_id（由 Session.new_proxy_id 分配）"
             )
 
         encrypted_body = self._qq_tea_encrypt(

@@ -363,12 +363,12 @@ class AutoRobAttackMod(BaseMod):
     def _enabled_init(self, now=None, **kwargs) -> list[DataPack]:
         """启用时的初始化：now 由管理器统一传入（datetime），缺省才回落本机时间"""
         # 时间限制
-        time_slots = self._get_time_slots()
-        if not time_slots:
-            raise ValueError("fit 缺失字段 'time_slots'")
-
-        if time_slots and (not self._time_pass(time_slots, now=now)):
-            raise ValueError("不在可运行的时间段内")
+        # time_slots = self._get_time_slots()
+        # if not time_slots:
+        #     raise ValueError("fit 缺失字段 'time_slots'")
+        #
+        # if time_slots and (not self._time_pass(time_slots, now=now)):
+        #     raise ValueError("不在可运行的时间段内")
         # 启动动作
         action_specs = [
             self.send_198935_action(),
