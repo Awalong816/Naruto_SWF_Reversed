@@ -488,6 +488,7 @@ class Socks5Manager:
                             direction=original_direction, # 路由关键在方向
                             data=event_data,
                         )
+                        # 兜底，就算不在协议内也原样发送
                         if forward_data:
                             action_packet_queue.append({
                                 "direction": original_direction,

@@ -458,7 +458,3 @@ class CryptGameDataManager:
 
 def get_game_data_crypt_manager():
     return CryptGameDataManager()
-
-
-if __name__ == "__main__":
-    pass

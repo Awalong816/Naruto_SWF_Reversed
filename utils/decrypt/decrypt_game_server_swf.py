@@ -98,6 +98,3 @@ class NarutoServerDecryptManager:
 def get_naruto_server_decrypt_manager():
     return NarutoServerDecryptManager()
 
-
-if __name__ == "__main__":
-    pass

@@ -34,9 +34,9 @@ def test_lzma_manager(test_path):
     return decompressed_data
 
 
-if __name__ == "__main__":
-    test_path = r"E:\pythonProject\启动器\essence_resource\flash\core\naruto.include.swf"
-    lzma_data = test_lzma_manager(test_path)
-    test_path = Path(test_path)
-    test_path.write_bytes(lzma_data)
-    print(f"解压重写入完成")
+# if __name__ == "__main__":
+#     test_path = r"E:\pythonProject\启动器\essence_resource\flash\core\naruto.include.swf"
+#     lzma_data = test_lzma_manager(test_path)
+#     test_path = Path(test_path)
+#     test_path.write_bytes(lzma_data)
+#     print(f"解压重写入完成")
