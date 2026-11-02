@@ -22,7 +22,6 @@ class DataPack:
     is_decrypted: bool | None = field(default=None) # 是否已经TEA解密
     need_type_reverse: str | None = field(default=None) # 需要逆向二进制格式化的方式
     request_id: int | None = field(default=None)
-    forward_response: bool = field(default=False) # 注入动作的回包是否透传给客户端（True 才会触发客户端 UI 效果）
 
     def update_data(self, data: bytes):
         self.value_data = data
@@ -69,7 +68,7 @@ class DataPacketManager:
         """
         转发前把整段数据切成完整包，改写包头里的请求 id 后再拼回去
         - game->server：客户端原始 id -> 会话代理 id，并登记还原映射
-        - server->game：代理 id -> 客户端原始 id；属于注入动作的回包按 forward_response 决定透传还是吞掉
+        - server->game：代理 id -> 客户端原始 id；
         没走完的半包留在缓冲里等下一段数据；非协议数据（如 <policy-file-request/>）原样放行
         :param session: 当前会话，持有发号器与两个映射表
         :param direction: 转发方向
@@ -107,9 +106,8 @@ class DataPacketManager:
                     # 客户端自己请求的回包，还原成客户端原本的号
                     frame[8:12] = session.out_index_map.pop((command_id, request_id)).to_bytes(4, "big")
                 elif request_id in session.injected:
-                    action_pack = session.injected.pop(request_id)
-                    if not action_pack.forward_response:
-                        continue # 吞掉，客户端不会看到这条回包
+                    session.injected.pop(request_id)
+                    continue # 吞掉，客户端不会看到这条回包
 
             out.extend(frame)
 

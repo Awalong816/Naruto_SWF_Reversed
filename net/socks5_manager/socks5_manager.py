@@ -444,7 +444,9 @@ class Socks5Manager:
             context=context,
             manager_stopped=self.stop_signal,
         )
+        # 每个线程一个专属的字节解析器 缓冲区隔离
         data_packet_manager = get_data_packet_manager()
+        # 记录双向 socket 通道
         sockets = [src_pipe, tag_pipe]
 
         try:
