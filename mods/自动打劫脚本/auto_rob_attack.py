@@ -360,7 +360,14 @@ class AutoRobAttackMod(BaseMod):
         return action_spec
 
     def send_198936_action(self, data) -> DataPack:
-        pass
+        # TODO: 转化为字节并统计长度
+        action_spec = DataPack(
+            direction="game->server",
+            direction_type=1,
+            command_id=198936,
+            need_type_reverse="protobuf",
+        )
+        return action_spec
 
     # ============= 继承方法 =============
     def _enabled_init(self, **kwargs) -> list[DataPack]:
