@@ -227,21 +227,6 @@ class AutoRobAttackMod(BaseMod):
                 return True
         return False
 
-    # 组装请求列表命令
-    @staticmethod
-    def send_198935_action() -> DataPack:
-        # TODO: 做成DataPack交给data_packet_manager转回bytes
-        action_spec = DataPack(
-            # mod侧负责
-            direction="game->server",
-            direction_type=1,
-            command_id=198935,
-            count=0,
-            value_data=b'',
-            need_type_reverse=None,
-        )
-        return action_spec
-
     def _apply_schema(self, fields: list | dict, schema: dict = ROB_LIST_RESPONSE_SCHEMA):
         """
         把 _read_protobuf() 得到的数字字段列表，
@@ -358,6 +343,24 @@ class AutoRobAttackMod(BaseMod):
         # 198935 使用protobuf二进制数据格式
         format_result = self._protobuf2readable(data)
         return format_result
+
+    # 组装请求列表命令
+    @staticmethod
+    def send_198935_action() -> DataPack:
+        # 做成DataPack交给data_packet_manager转回bytes
+        action_spec = DataPack(
+            # mod侧负责
+            direction="game->server",
+            direction_type=1,
+            command_id=198935,
+            count=0,
+            value_data=b'',
+            need_type_reverse=None,
+        )
+        return action_spec
+
+    def send_198936_action(self, data) -> DataPack:
+        pass
 
     # ============= 继承方法 =============
     def _enabled_init(self, **kwargs) -> list[DataPack]:
