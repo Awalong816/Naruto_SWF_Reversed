@@ -217,7 +217,6 @@ class AutoRobAttackMod(BaseMod):
 
     @staticmethod
     def _time_pass(time_slots, now=None):
-        now = now or datetime.now()
         now_time = now.time()
 
         for slot_start, slot_end in time_slots:
@@ -355,14 +354,16 @@ class AutoRobAttackMod(BaseMod):
         sorted_attack_list = sorted(attack_list, key=lambda item: item["priority"])
         self.attack_list = sorted_attack_list
 
-    def recv_198935_action(self):
+    def recv_198935_action(self, data):
         # 198935 使用protobuf二进制数据格式
-        pass
+        format_result = self._protobuf2readable(data)
+        return format_result
 
     # ============= 继承方法 =============
-    def _enabled_init(self, now=None, **kwargs) -> list[DataPack]:
+    def _enabled_init(self, **kwargs) -> list[DataPack]:
         """启用时的初始化：now 由管理器统一传入（datetime），缺省才回落本机时间"""
         # 时间限制
+        now = self._get_now()
         time_slots = self._get_time_slots()
         if not time_slots:
             raise ValueError("fit 缺失字段 'time_slots'")
@@ -375,20 +376,25 @@ class AutoRobAttackMod(BaseMod):
         ]
         return action_specs
 
-    def start(self, now=None, **kwargs) -> list[DataPack]:
+    def start(self, **kwargs) -> list[DataPack]:
         try:
+            now = self._get_now()
             self.enabled = True
             action_specs = self._enabled_init(now=now)
+            self.running_log.append(f"{now.strftime('%H:%M:%S')}\nMOD 开始运行\n")
             return action_specs
         except Exception as err:
             self.enabled = False
             raise err
 
-    def stop(self, now=None, **kwargs):
+    def stop(self, **kwargs):
+        now = self._get_now()
+        self.running_log.append(f"{now.strftime('%H:%M:%S')}\nMOD 停止运行\n\n")
         self.enabled = False
 
-    def event_trigger(self, data, now=None, **kwargs):
+    def event_trigger(self, data, **kwargs):
         # 时间限制
+        now = self._get_now()
         time_slots = self._get_time_slots()
         if not time_slots:
             self.enabled = False
@@ -401,7 +407,7 @@ class AutoRobAttackMod(BaseMod):
         # 业务内容
         if not isinstance(data, list):
             raise TypeError(f"<auto_rob_attack event_trigger> only support list input")
-        format_data = self._protobuf2readable(data)
+        format_data = self.recv_198935_action(data)
         print(format_data)
         for index, aim in enumerate(self.attack_list):
             # 每个session一个实例，不需要上锁
@@ -413,6 +419,7 @@ class AutoRobAttackMod(BaseMod):
                 print(f"aim:{aim_name}: {aim_zone_id} -- item:{item.get('name')}:{item.get('server_id')}")
                 if (item.get("name") == aim_name or item.get("uin") == aim_uin) and (
                         item.get("server_id") == aim_zone_id):
+                    self.running_log.append(f"{now.strftime('%H:%M:%S')}\n找到目标 <{aim_name or item.get('name')}>;")
                     if not aim_uin and item.get("uin"):
                         self.attack_list[index]["uin"] = item.get("uin")
                         try:
@@ -422,12 +429,13 @@ class AutoRobAttackMod(BaseMod):
                             logging.warning(f"更新 mod <auto_rob_attack> 配置文件失败: {err}")
                     if item.get("task_id") in SS_TASK_IDS:
                         self.enabled = False # 成功进入战斗后退出脚本
-                        print("找到")
+                        self.running_log.append(f"正在尝试发送攻击指令...")
                         # TODO: find aim 发送198936
                         return
+                    else:
+                        self.running_log.append(f"镖型错误\n")
 
-        print("没有找到")
-        # TODO: 没有找到，继续循环出发198935
+        self.running_log.append(f"{now.strftime('%H:%M:%S')}\n当前列表没有找到目标\n")
         action_specs = [
             self.send_198935_action()
         ]

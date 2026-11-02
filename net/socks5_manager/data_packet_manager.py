@@ -152,6 +152,7 @@ class DataPacketManager:
             if not completed_datas:
                 return
             data_packets = []
+            local_user_info = {}
             for completed_data in completed_datas:
                 count = int.from_bytes(completed_data[2:4],"big")
                 command_id = int.from_bytes(completed_data[4:8],"big")
@@ -160,6 +161,12 @@ class DataPacketManager:
                 uin = int.from_bytes(completed_data[24:28],"big")
                 role_id = int.from_bytes(completed_data[28:30],"big")
                 server_id = int.from_bytes(completed_data[30:32],"big")
+
+                if uin and server_id:
+                    local_user_info["uin"] = uin
+                    local_user_info["role_id"] = role_id
+                    local_user_info["server_id"] = server_id
+
                 if command_id in self.decrypt_need_command_id:
                     value_data = self.decrypt_manager.decrypt_data(completed_data)
                     is_decrypted = True
@@ -187,10 +194,13 @@ class DataPacketManager:
                                      dismiss_id=[250882],
                                      )
                 data_packets.append(data_packet)
-            return data_packets
+            if local_user_info:
+                return data_packets, local_user_info
+            else:
+                return data_packets, None
         except Exception as err:
             logging.warning(f"{err}")
-            return
+            return None, None
 
     @staticmethod
     def _log_report(data_pack: DataPack, aim_id=None, dismiss_id=None):

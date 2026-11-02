@@ -499,27 +499,26 @@ class Socks5Manager:
 
                         if data_packet_manager is not None:  # 不是一次发送对应一个完整包，是一对n包括0
 
-                            data_packets = data_packet_manager.parse_data(
+                            data_packets, local_user_info = data_packet_manager.parse_data(
                                 context=context,
                                 direction=original_direction,
                                 data=event_data,
                                 debug=self.debug,
                             )
                             # 首次打通将头部固定不变的内容写入会话属性
-                            if data_packets and len(data_packets) > 0:
-                                if not session.session_id:
-                                    session.uin = data_packets[0].uin
-                                    session.role_id = data_packets[0].role_id
-                                    session.server_id = data_packets[0].server_id
-                                    session.bind_session_id()
-                                    try:
-                                        self._log_in_session(session.session_id, session)
-                                        logging.info(f"会话 {session.session_id} 已成功注册")
-                                        if self.debug:
-                                            logging.info(f"\n当前所有会话状态:\n{self.having_sessions}\n")
-                                    except Exception as err:
-                                        logging.warning(f"添加新会话失败: {err}")
-                                        return
+                            if local_user_info and not session.session_id:
+                                session.uin = local_user_info["uin"]
+                                session.role_id = local_user_info["role_id"]
+                                session.server_id = local_user_info["server_id"]
+                                try:
+                                    self._log_in_session(session.session_id, session)
+                                    logging.info(f"会话 {session.session_id} 已成功注册")
+                                    if self.debug:
+                                        logging.info(f"\n当前所有会话状态:\n{self.having_sessions}\n")
+                                except Exception as err:
+                                    logging.warning(f"添加新会话失败: {err}")
+                                    return
+
                             # TODO mod按需求分发层分发
                             extra_action_queue = self.mods_manager.session_extra_queue.get(session.session_id)
                             if extra_action_queue is not None:

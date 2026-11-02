@@ -7,7 +7,7 @@ class FrontendDataSource:
 
     职责：
     把 Socks5Manager / ModManager 的内部状态，转成前端可安全使用的「纯数据」。
-    GUI 线程只碰这里的返回值，绝不直接引用 Session / ModRunTime 对象，
+    GUI 线程只碰这里的返回值，绝不直接引用 Session / BaseMod 实例对象，
     避免和 socks5 工作线程的注册/注销发生跨线程竞态。
     """
 
@@ -76,7 +76,7 @@ class FrontendDataSource:
         这里只负责选对入口：
           1. 优先走 ModManager.start_mod_in_session / stop_mod_in_session（后端统一入口，含锁）
           2. 后端没提供时直接调实例的 start/stop
-        绝不再走 ModRunTime.start/stop —— 它写死了 `enabled_init` 这个名字，与实例实现容易脱节。
+        不再经由任何中间包装层转调 —— 那层写死了 `enabled_init` 这个名字，与实例实现容易脱节。
         """
         if not session_id or not mod_id:
             return False, "参数不完整"
@@ -85,15 +85,11 @@ class FrontendDataSource:
         if mods_manager is None:
             return False, "mod管理器不可用"
 
-        runtime = self._get_runtime(mods_manager, session_id, mod_id)
-        if runtime is None:
+        instance = self._get_instance(mods_manager, session_id, mod_id)
+        if instance is None:
             return False, "mod不存在（会话可能已注销）"
 
-        instance = getattr(runtime, "instance", None)
-        if instance is None:
-            return False, "mod实例缺失"
-
-        if enabled and runtime.is_enabled():
+        if enabled and instance.is_enabled():
             return True, "已处于开启状态"
 
         try:
@@ -117,8 +113,8 @@ class FrontendDataSource:
                 pass
             return False, f"操作失败: {err}"
 
-    def _get_runtime(self, mods_manager, session_id: str, mod_id: str):
-        """在锁内取一次 ModRunTime 引用（锁外再调用它，避免持锁跑业务）"""
+    def _get_instance(self, mods_manager, session_id: str, mod_id: str):
+        """在锁内取一次 mod 实例引用（锁外再调用它，避免持锁跑业务）"""
         states = getattr(mods_manager, "session_mods_state", None)
         if states is None:
             return None
@@ -138,12 +134,11 @@ class FrontendDataSource:
         result = {}
 
         def build():
-            for mod_id, runtime in (states.get(session_id) or {}).items():
-                instance = getattr(runtime, "instance", None)
+            for mod_id, instance in (states.get(session_id) or {}).items():
                 result[mod_id] = {
-                    "enabled": bool(runtime.is_enabled()),
+                    "enabled": bool(instance.is_enabled()),
                     "info": dict(getattr(instance, "MOD_INFO", {}) or {}),
-                    "running_log": list(getattr(runtime, "running_log", []) or []),
+                    "running_log": list(getattr(instance, "running_log", []) or []),
                 }
 
         if lock is not None:

@@ -19,8 +19,14 @@ class BaseMod:
     def __init__(self):
         # 可变
         self.enabled: bool = False
+        self.running_log: list[str] = []
 
-    def _enabled_init(self, now=None, **kwargs) -> list[DataPack]:
+    @staticmethod
+    def _get_now():
+        now = datetime.now()
+        return now
+
+    def _enabled_init(self, **kwargs) -> list[DataPack]:
         """
         mod在启用时开始需要发送的动作，可以为空
         :return:
@@ -32,9 +38,9 @@ class BaseMod:
         状态机函数
         :return:
         """
-        ...
+        return self.enabled
 
-    def event_trigger(self, data, now=None, **kwargs):
+    def event_trigger(self, data, **kwargs):
         """
         触发事件，非必要
         :param data_packet:
@@ -42,36 +48,23 @@ class BaseMod:
         """
         ...
 
-    def timer_trigger(self, now=None, **kwargs):
+    def timer_trigger(self, **kwargs):
         """
         定时事件，非必要
         :return:
         """
         ...
 
-    def start(self, now=None, **kwargs) -> list[DataPack]:
+    def start(self, **kwargs) -> list[DataPack]:
         ...
 
-    def stop(self, now=None, **kwargs):
+    def stop(self, **kwargs):
         ...
 
 @dataclass
 class ModsLib:
     mod_self: dict = field(default_factory=dict)
     event_trigger_map: dict = field(default_factory=dict)
-
-
-# 每个模型的运行状态
-class ModRunTime:
-    def __init__(self, mod: BaseMod):
-        # 本体
-        self.instance = mod
-        # 运行日志
-        self.running_log = []
-
-    # 状态取每一刻的同步状态=指针，否则加入类成员就是某一时刻的静止快照
-    def is_enabled(self):
-        return self.instance.enabled
 
 
 class ModManager:
@@ -84,7 +77,7 @@ class ModManager:
         self.mod_lock = th.Lock()
 
         self.mods_lib = ModsLib() # 静态注册，保留mod的所有信息
-        self.session_mods_state: dict[str, dict[str, ModRunTime]] = {}
+        self.session_mods_state: dict[str, dict[str, BaseMod]] = {}
         # mod产生的所有动作方向都应该是发送给服务器
         self.session_extra_queue: dict[str, queue.Queue] = {} # 额外动作队列字典，因为不是所有动作都由已知session_id的data_packet发送，比如enabled_init,定时触发事件
 
@@ -180,37 +173,32 @@ class ModManager:
                         "data_type": fit.get("data_type"),
                     })
 
-    @staticmethod
-    def _get_now():
-        now = datetime.now()
-        return now
-
     def log_in_session(self, session_id):
         with self.mod_lock:
             if session_id not in self.session_mods_state:
-                id_runtimes = {}
+                id_instance = {}
                 for mod_id, mod_cls in self.mods_lib.mod_self.items():
                     instance = mod_cls()
                     try:
-                        id_runtimes[mod_id] = ModRunTime(mod=instance)
+                        id_instance[mod_id] = instance
                     except Exception as err:
                         logging.warning(f"会话 {session_id} 添加mod实例失败: {err}")
                 # 先构造好，再一次性登记，消除空表窗口
-                self.session_mods_state[session_id] = id_runtimes
+                self.session_mods_state[session_id] = id_instance
                 self.session_extra_queue[session_id] = queue.Queue()
                 logging.info(f"会话 {session_id} 添加mod完成")
                 print(f"会话 {session_id} 状态机:\n{self.session_mods_state}")
 
     def log_off_session(self, session_id):
         with self.mod_lock:
-            runtimes = self.session_mods_state.pop(session_id, None)  # 先摘表
+            mod_instances = self.session_mods_state.pop(session_id, None)  # 先摘表
             self.session_extra_queue.pop(session_id, None)  # 先摘队
-        if runtimes is None:
+        if mod_instances is None:
             logging.warning(f"没有找到会话 {session_id} 注册mod状态机")
             return
-        for mod_id, mod_runtime in runtimes.items():  # 锁外停
+        for mod_id, instance in mod_instances.items():  # 锁外停
             try:
-                mod_runtime.instance.stop()
+                instance.stop()
             except Exception as err:
                 logging.warning(f"会话 {session_id} 关闭mod {mod_id} 失败: {err}")
 
@@ -219,58 +207,46 @@ class ModManager:
         session_mod_map = {}
         with self.mod_lock:
             session_mods = self.session_mods_state.get(session_id) or {}
-            for mod_id, mod_runtime in session_mods.items():
+            for mod_id, instance in session_mods.items():
                 session_mod_map[mod_id] = {
-                    "enabled": mod_runtime.is_enabled(),
-                    "info": dict(mod_runtime.instance.MOD_INFO),
-                    "running_log": list(mod_runtime.running_log),
+                    "enabled": instance.is_enabled(),
+                    "info": dict(instance.MOD_INFO),
+                    "running_log": list(instance.running_log),
                 }
         return session_mod_map
 
     def start_mod_in_session(self, session_id, mod_id):
-        try:
-            with self.mod_lock:
-                session_table = self.session_mods_state.get(session_id)
-                extra_action_queue = self.session_extra_queue.get(session_id)
-                if not session_table:
-                    raise ValueError(f"session {session_id} 没有注册状态机或状态机为空表")
-                runtime = session_table.get(mod_id)
-                if not runtime:
-                    raise ValueError(f"mod <{mod_id}> 状态无法查询")
+        with self.mod_lock:
+            session_table = self.session_mods_state.get(session_id)
+            extra_action_queue = self.session_extra_queue.get(session_id)
+            if not session_table:
+                raise ValueError(f"session {session_id} 没有注册状态机或状态机为空表")
+            instance = session_table.get(mod_id)
+            if not instance:
+                raise ValueError(f"mod <{mod_id}> 状态无法查询")
 
-            mod_instance = runtime.instance
-            now = self._get_now()
-            result = mod_instance.start(now=now)
-            session_table[mod_id].running_log.append(f"{now.strftime('%Y-%m-%d %H:%M:%S')}:\n<{runtime.instance.MOD_INFO.get('name')}> 开始运行")
-            # 读动作内容包成DataPack发送给服务器
-            if result:
-                for action_spec in result:
-                    match action_spec.need_type_reverse:
-                        case "protobuf":
-                            action_spec.value_data = self.type_reader.reverse_body(action_spec.value_data, "protobuf")
-                        case _:
-                            pass
-                    extra_action_queue.put(action_spec) # 最后交给data_packet_manager加密加头
-            print(f"action result: {result}")
-        except Exception as err:
-            raise err
+        result = instance.start()
+       # 读动作内容包成DataPack发送给服务器
+        if result:
+            for action_spec in result:
+                match action_spec.need_type_reverse:
+                    case "protobuf":
+                        action_spec.value_data = self.type_reader.reverse_body(action_spec.value_data, "protobuf")
+                    case _:
+                        pass
+                extra_action_queue.put(action_spec)  # 最后交给data_packet_manager加密加头
+        print(f"action result: {result}")
 
     def stop_mod_in_session(self, session_id, mod_id):
-        try:
-            with self.mod_lock:
-                session_table = self.session_mods_state.get(session_id)
-                if not session_table:
-                    raise ValueError(f"session {session_id} 没有注册状态机或状态机为空表")
-                runtime = session_table.get(mod_id)
-                if not runtime:
-                    raise ValueError(f"mod <{mod_id}> 状态无法查询")
+        with self.mod_lock:
+            session_table = self.session_mods_state.get(session_id)
+            if not session_table:
+                raise ValueError(f"session {session_id} 没有注册状态机或状态机为空表")
+            instance = session_table.get(mod_id)
+            if not instance:
+                raise ValueError(f"mod <{mod_id}> 状态无法查询")
 
-            now = self._get_now()
-            mod_instance = runtime.instance
-            mod_instance.stop()
-            runtime.running_log.append(f"{now.strftime('%Y-%m-%d %H:%M:%S')}:\n<{runtime.instance.MOD_INFO.get('name')}> 停止运行")
-        except Exception as err:
-            raise err
+        instance.stop()
 
     def event_trigger(self, session_id, data_packets: list[DataPack]):
         pass
