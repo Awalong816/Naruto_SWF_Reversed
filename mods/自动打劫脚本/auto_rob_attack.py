@@ -360,7 +360,7 @@ class AutoRobAttackMod(BaseMod):
         return action_spec
 
     def send_198936_action(self, data) -> DataPack:
-        # TODO: 转化为字节并统计长度
+        # TODO: 换回 protobuf
         action_spec = DataPack(
             direction="game->server",
             direction_type=1,

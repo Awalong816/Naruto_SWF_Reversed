@@ -400,6 +400,8 @@ class Socks5Manager:
             pass
 
     def _log_in_session(self, session_id, body: Session):
+        if not session_id:
+            raise ValueError("未绑定的session_id")
         with self.session_lock:
             if len(self.having_sessions) < self.max_service_session:
                 if session_id not in self.having_sessions.keys():
@@ -510,6 +512,8 @@ class Socks5Manager:
                                 session.uin = local_user_info["uin"]
                                 session.role_id = local_user_info["role_id"]
                                 session.server_id = local_user_info["server_id"]
+                                # 此处绑定会话id
+                                session.bind_session_id()
                                 try:
                                     self._log_in_session(session.session_id, session)
                                     logging.info(f"会话 {session.session_id} 已成功注册")

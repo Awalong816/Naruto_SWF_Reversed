@@ -150,7 +150,7 @@ class DataPacketManager:
         try:
             completed_datas = self.completed_data_stream(direction, data) # 粘包不改变方向
             if not completed_datas:
-                return
+                return [], None
             data_packets = []
             local_user_info = {}
             for completed_data in completed_datas:
