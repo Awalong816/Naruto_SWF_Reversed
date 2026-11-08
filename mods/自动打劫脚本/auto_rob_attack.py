@@ -431,7 +431,7 @@ class AutoRobAttackMod(BaseMod):
                 print(f"aim:{aim_name}: {aim_zone_id} -- item:{item.get('name')}:{item.get('server_id')}")
                 if (item.get("name") == aim_name or str(item.get("uin")) == aim_uin) and (
                         item.get("server_id") == aim_zone_id):
-                    self._new_log(f"{now.strftime('%H:%M:%S')}\n找到目标 <{aim_name or item.get('name')}>;")
+                    self._new_log(f"{now.strftime('%H:%M:%S')}\n{'/'*50}\n找到目标 <{aim_name or item.get('name')}>;")
                     if not aim_uin and item.get("uin"):
                         self.attack_list[index]["uin"] = str(item.get("uin"))
                         try:
@@ -446,6 +446,7 @@ class AutoRobAttackMod(BaseMod):
                         return []
                     else:
                         self._new_log(f"镖型错误\n")
+                    self._new_log("/"*50)
 
         self._new_log(f"{now.strftime('%H:%M:%S')}\n当前列表没有找到目标\n")
         action_specs = [
