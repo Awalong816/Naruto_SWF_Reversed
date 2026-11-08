@@ -336,7 +336,7 @@ class AutoRobAttackMod(BaseMod):
         if len(attack_list) == 0:
             raise ValueError("配置文件不完整或列表为空")
 
-        sorted_attack_list = sorted(attack_list, key=lambda item: item["priority"])
+        sorted_attack_list = sorted(attack_list, key=lambda item: int(item.get("priority", 0)))
         self.attack_list = sorted_attack_list
 
     def recv_198935_action(self, data):
@@ -391,7 +391,7 @@ class AutoRobAttackMod(BaseMod):
             now = self._get_now()
             self.enabled = True
             action_specs = self._enabled_init(now=now)
-            self.running_log.append(f"{now.strftime('%H:%M:%S')}\nMOD 开始运行\n")
+            self._new_log(f"{now.strftime('%H:%M:%S')}\nMOD 开始运行\n")
             return action_specs
         except Exception as err:
             self.enabled = False
@@ -399,7 +399,7 @@ class AutoRobAttackMod(BaseMod):
 
     def stop(self, **kwargs):
         now = self._get_now()
-        self.running_log.append(f"{now.strftime('%H:%M:%S')}\nMOD 停止运行\n\n")
+        self._new_log(f"{now.strftime('%H:%M:%S')}\nMOD 停止运行\n\n")
         self.enabled = False
 
     def event_trigger(self, data, **kwargs):
@@ -418,20 +418,22 @@ class AutoRobAttackMod(BaseMod):
         if not isinstance(data, list):
             raise TypeError(f"<auto_rob_attack event_trigger> only support list input")
         format_data = self.recv_198935_action(data)
+        #
         print(format_data)
+        #
         for index, aim in enumerate(self.attack_list):
             # 每个session一个实例，不需要上锁
-            aim_name = aim["name"]
-            aim_uin = aim["uin"]
-            aim_zone_id = aim["zone_id"]
+            aim_name = str(aim["name"])
+            aim_uin = str(aim["uin"]).strip()
+            aim_zone_id = int(aim["zone_id"])
 
             for item in format_data:
                 print(f"aim:{aim_name}: {aim_zone_id} -- item:{item.get('name')}:{item.get('server_id')}")
-                if (item.get("name") == aim_name or item.get("uin") == aim_uin) and (
+                if (item.get("name") == aim_name or str(item.get("uin")) == aim_uin) and (
                         item.get("server_id") == aim_zone_id):
-                    self.running_log.append(f"{now.strftime('%H:%M:%S')}\n找到目标 <{aim_name or item.get('name')}>;")
+                    self._new_log(f"{now.strftime('%H:%M:%S')}\n找到目标 <{aim_name or item.get('name')}>;")
                     if not aim_uin and item.get("uin"):
-                        self.attack_list[index]["uin"] = item.get("uin")
+                        self.attack_list[index]["uin"] = str(item.get("uin"))
                         try:
                             self._save_attack_list_config()
                             logging.info(f"更新 mod <auto_rob_attack> 配置文件成功")
@@ -439,13 +441,13 @@ class AutoRobAttackMod(BaseMod):
                             logging.warning(f"更新 mod <auto_rob_attack> 配置文件失败: {err}")
                     if item.get("task_id") in SS_TASK_IDS:
                         self.enabled = False # 成功进入战斗后退出脚本
-                        self.running_log.append(f"正在尝试发送攻击指令...")
+                        self._new_log(f"正在尝试发送攻击指令...")
                         # TODO: find aim 发送198936
-                        return
+                        return []
                     else:
-                        self.running_log.append(f"镖型错误\n")
+                        self._new_log(f"镖型错误\n")
 
-        self.running_log.append(f"{now.strftime('%H:%M:%S')}\n当前列表没有找到目标\n")
+        self._new_log(f"{now.strftime('%H:%M:%S')}\n当前列表没有找到目标\n")
         action_specs = [
             self.send_198935_action()
         ]

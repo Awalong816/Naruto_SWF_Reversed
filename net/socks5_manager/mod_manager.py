@@ -26,6 +26,11 @@ class BaseMod:
         now = datetime.now()
         return now
 
+    def _new_log(self, context: str):
+        self.running_log.append(context)
+        if len(self.running_log) >= 100:
+            self.running_log = self.running_log[-100:]
+
     def _enabled_init(self, **kwargs) -> list[DataPack]:
         """
         mod在启用时开始需要发送的动作，可以为空
@@ -43,7 +48,7 @@ class BaseMod:
     def event_trigger(self, data, **kwargs):
         """
         触发事件，非必要
-        :param data_packet:
+        :data:
         :return:
         """
         ...
@@ -158,8 +163,8 @@ class ModManager:
                 if direction is None or command_id is None:
                     continue
 
-                key = (direction, command_id)
-                buckets = self.mods_lib.event_trigger_map.setdefault(key, [])
+                indentify_key = (direction, command_id)
+                buckets = self.mods_lib.event_trigger_map.setdefault(indentify_key, [])
 
                 repeat = False
                 for item in buckets:
@@ -172,6 +177,16 @@ class ModManager:
                         "mod_id": mod_id,
                         "data_type": fit.get("data_type"),
                     })
+
+    def _datapacket_add_queue(self, session_action_queue, data_packets: list):
+        for action_spec in data_packets:
+            match action_spec.need_type_reverse:
+                case "protobuf":
+                    action_spec.value_data = self.type_reader.reverse_body(action_spec.value_data, "protobuf")
+                case _:
+                    pass
+
+            session_action_queue.put(action_spec)
 
     def log_in_session(self, session_id):
         with self.mod_lock:
@@ -215,6 +230,7 @@ class ModManager:
                 }
         return session_mod_map
 
+    # 前端主动触发的，可以报错
     def start_mod_in_session(self, session_id, mod_id):
         with self.mod_lock:
             session_table = self.session_mods_state.get(session_id)
@@ -228,15 +244,13 @@ class ModManager:
         result = instance.start()
        # 读动作内容包成DataPack发送给服务器
         if result:
-            for action_spec in result:
-                match action_spec.need_type_reverse:
-                    case "protobuf":
-                        action_spec.value_data = self.type_reader.reverse_body(action_spec.value_data, "protobuf")
-                    case _:
-                        pass
-                extra_action_queue.put(action_spec)  # 最后交给data_packet_manager加密加头
+            self._datapacket_add_queue(
+                session_action_queue=extra_action_queue,
+                data_packets=result,
+            )
         print(f"action result: {result}")
 
+    # 前端主动触发的，可以报错
     def stop_mod_in_session(self, session_id, mod_id):
         with self.mod_lock:
             session_table = self.session_mods_state.get(session_id)
@@ -248,8 +262,42 @@ class ModManager:
 
         instance.stop()
 
+    # 嵌入链路中不能raise，否则整个连接被打断
     def event_trigger(self, session_id, data_packets: list[DataPack]):
-        pass
+        with self.mod_lock:
+            session_table = self.session_mods_state.get(session_id)
+            if not session_table:
+                logging.warning(f"session {session_id} 没有注册状态机或状态机为空表")
+                return
+            extra_action_queue = self.session_extra_queue.get(session_id)
+
+        for data_packet in data_packets:
+            direction = data_packet.direction
+            command_id = data_packet.command_id
+            data = data_packet.value_data
+            indentify = (direction, command_id)
+            if indentify in self.mods_lib.event_trigger_map.keys():
+                mod_list = self.mods_lib.event_trigger_map.get(indentify)
+                for mod in mod_list:
+                    mod_id = mod["mod_id"]
+                    data_type = mod.get("data_type")
+                    instance = session_table.get(mod_id)
+                    if instance and instance.is_enabled():
+                        try:
+                            match data_type:
+                                case "protobuf":
+                                    input_data = self.type_reader.read_bytes(data, "protobuf")
+                                case _:
+                                    input_data = data
+
+                            result = instance.event_trigger(input_data)
+                            if result:
+                                self._datapacket_add_queue(
+                                    session_action_queue=extra_action_queue,
+                                    data_packets=result,
+                                )
+                        except Exception as err:
+                            logging.warning(f"会话: {session_id}\nmod: {mod_id}\n触发失败: {err}\n")
 
     def timer_trigger(self, session_id):
         pass

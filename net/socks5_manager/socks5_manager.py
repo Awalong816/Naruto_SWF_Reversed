@@ -459,7 +459,7 @@ class Socks5Manager:
                     sockets,  # 对应可读监控列表
                     [],  # 对应可写监控列表，基本都不为空，忽略
                     sockets,  # 对应错误的监控列表
-                    0.3,  # 等不到抉择时间
+                    0.5,  # 等不到抉择时间
                 )
                 # 有任何断裂就结束
                 if wrongs:
@@ -523,7 +523,12 @@ class Socks5Manager:
                                     logging.warning(f"添加新会话失败: {err}")
                                     return
 
-                            # TODO mod按需求分发层分发
+                            # 分发触发事件
+                            if session.session_id:
+                                self.mods_manager.event_trigger(session.session_id, data_packets)
+                            # TODO: 定时触发事件
+
+                            # 整理发送队列
                             extra_action_queue = self.mods_manager.session_extra_queue.get(session.session_id)
                             if extra_action_queue is not None:
                                 while True:

@@ -11,10 +11,16 @@
   },
   "attack_list": [
     {
+      "zone_id": 506,
+      "name": "大魔姬亚子",
+      "uin": "1197427082",
+      "priority": 0
+    },
+    {
       "zone_id": 6153,
       "name": "剑来☯刚少",
       "uin": "",
-      "priority": 0
+      "priority": 1
     },
     {
       "zone_id": 573,
