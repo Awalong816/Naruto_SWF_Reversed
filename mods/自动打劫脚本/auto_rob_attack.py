@@ -338,6 +338,7 @@ class AutoRobAttackMod(BaseMod):
 
         sorted_attack_list = sorted(attack_list, key=lambda item: int(item.get("priority", 0)))
         self.attack_list = sorted_attack_list
+        print(f"当前目标列表: {self.attack_list}")
 
     def recv_198935_action(self, data):
         # 198935 使用protobuf二进制数据格式
@@ -372,6 +373,7 @@ class AutoRobAttackMod(BaseMod):
     # ============= 继承方法 =============
     def _enabled_init(self, **kwargs) -> list[DataPack]:
         """启用时的初始化：now 由管理器统一传入（datetime），缺省才回落本机时间"""
+        self.load_config()
         # 时间限制
         now = self._get_now()
         time_slots = self._get_time_slots()
@@ -432,6 +434,7 @@ class AutoRobAttackMod(BaseMod):
                 if (item.get("name") == aim_name or str(item.get("uin")) == aim_uin) and (
                         item.get("server_id") == aim_zone_id):
                     self._new_log(f"{now.strftime('%H:%M:%S')}\n找到目标 <{aim_name or item.get('name')}>;")
+                    self._new_log(f"详细信息:\n{item}")
                     if not aim_uin and item.get("uin"):
                         self.attack_list[index]["uin"] = str(item.get("uin"))
                         try:
