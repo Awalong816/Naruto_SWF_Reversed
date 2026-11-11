@@ -373,6 +373,7 @@ class AutoRobAttackMod(BaseMod):
     # ============= 继承方法 =============
     def _enabled_init(self, **kwargs) -> list[DataPack]:
         """启用时的初始化：now 由管理器统一传入（datetime），缺省才回落本机时间"""
+        # 放在启动位置热加载
         self.load_config()
         # 时间限制
         now = self._get_now()
